@@ -1,213 +1,220 @@
 (function () {
     'use strict';
 
-    if (!window.Lampa) return;
-
-    // ==============================
-    // Балансери
-    // ==============================
-
-    var sources = [
-        { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
-        { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
-        { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
-        { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
-    ];
-
-    // ==============================
-    // CSS
-    // ==============================
-
-    $('body').append(`
-    <style>
-    .multi-container { padding:20px; }
-    .multi-item {
-        display:flex;
-        justify-content:space-between;
-        align-items:center;
-        padding:15px;
-        margin-bottom:10px;
-        background:rgba(255,255,255,0.05);
-        border-radius:10px;
-        transition:0.3s;
+    if (!window.appready) {
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') init();
+        });
+    } else {
+        init();
     }
-    .multi-item.focus {
-        background:rgba(255,255,255,0.1);
-        transform:scale(1.02);
-    }
-    .multi-toggle {
-        padding:6px 14px;
-        border-radius:20px;
-        font-weight:bold;
-        transition:0.3s;
-        min-width:120px;
-        text-align:center;
-    }
-    .multi-toggle.enabled {
-        background:#46b85a;
-    }
-    .multi-toggle.disabled {
-        background:#d24a4a;
-    }
-    .multi-apply {
-        text-align:center;
-        margin-top:20px;
-        padding:15px;
-        background:#156DD1;
-        border-radius:10px;
-        font-weight:bold;
-        transition:0.3s;
-    }
-    .multi-apply.focus {
-        background:#1f82ff;
-        transform:scale(1.03);
-    }
-    </style>
-    `);
 
-    // ==============================
-    // Завантаження активних
-    // ==============================
+    function init() {
 
-    function loadActiveSources() {
-        sources.forEach(function (src) {
+        var sources = [
+            { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
+            { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
+            { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
+            { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
+        ];
 
-            var enabled = Lampa.Storage.get('multi_' + src.name, false);
-            if (!enabled) return;
+        if (!Lampa.Storage.get('multiplugin_sources')) {
+            Lampa.Storage.set('multiplugin_sources', {});
+        }
 
-            if (document.querySelector('script[src="' + src.url + '"]')) return;
+        function getState(name) {
+            var data = Lampa.Storage.get('multiplugin_sources') || {};
+            return data[name] || false;
+        }
 
+        function setState(name, state) {
+            var data = Lampa.Storage.get('multiplugin_sources') || {};
+            data[name] = state;
+            Lampa.Storage.set('multiplugin_sources', data);
+        }
+
+        function injectScript(url) {
+            if (document.querySelector('script[src="' + url + '"]')) return;
             var script = document.createElement('script');
-            script.src = src.url;
-            script.async = false;
+            script.src = url;
+            script.async = true;
             document.body.appendChild(script);
+        }
 
-            console.log('[MultiPlugin] Loaded:', src.name);
-        });
-    }
-
-    // ==============================
-    // Модал керування
-    // ==============================
-
-    function openSourcesModal() {
-
-        var changes = false;
-        var container = $('<div class="multi-container"></div>');
-        var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
-
-        sources.forEach(function (src) {
-
-            var storageKey = 'multi_' + src.name;
-            var enabled = Lampa.Storage.get(storageKey, false);
-
-            var item = $(`
-                <div class="multi-item selector">
-                    <div>${src.name}</div>
-                    <div class="multi-toggle ${enabled ? 'enabled' : 'disabled'}">
-                        ${enabled ? 'Увімкнено' : 'Вимкнено'}
-                    </div>
-                </div>
-            `);
-
-            item.on('hover:enter', function () {
-
-                enabled = !enabled;
-                Lampa.Storage.set(storageKey, enabled);
-
-                item.find('.multi-toggle')
-                    .removeClass('enabled disabled')
-                    .addClass(enabled ? 'enabled' : 'disabled')
-                    .text(enabled ? 'Увімкнено' : 'Вимкнено');
-
-                changes = true;
-                applyButton.show();
-
+        function removeScript(url) {
+            var scripts = document.querySelectorAll('script[src="' + url + '"]');
+            scripts.forEach(function (s) {
+                s.remove();
             });
+        }
 
-            container.append(item);
-        });
-
-        applyButton.on('hover:enter', function () {
+        function showRestartModal() {
 
             Lampa.Modal.open({
-                title: 'Перезапуск потрібен',
-                text: 'Застосувати зміни зараз?',
+                title: 'Перезапуск Lampa',
+                html: '<div style="padding:20px;font-size:18px;">Для застосування змін потрібно перезапустити Lampa</div>',
                 buttons: [
                     {
-                        name: 'Так',
+                        name: 'Перезапустити',
                         onSelect: function () {
                             location.reload();
                         }
                     },
                     {
-                        name: 'Ні',
+                        name: 'Пізніше',
                         onSelect: function () {
                             Lampa.Modal.close();
                         }
                     }
                 ]
             });
+        }
 
-        });
+        function openMenu() {
 
-        container.append(applyButton);
+            var html = '<div class="multiplugin-menu">';
 
-        Lampa.Modal.open({
-            title: 'Мультиплагін — Балансери',
-            html: container
-        });
+            sources.forEach(function (source) {
 
-        Lampa.Controller.collectionSet(container);
-        Lampa.Controller.collectionFocus(container.find('.selector').first());
-    }
+                var active = getState(source.name);
 
-    // ==============================
-    // Додаємо в Налаштування
-    // ==============================
+                html += `
+                <div class="balancer-item">
+                    <div class="balancer-left">
+                        <div class="balancer-dot ${active ? 'active' : ''}"></div>
+                        <div class="balancer-name">${source.name}</div>
+                    </div>
+                    <div class="balancer-btn ${active ? 'on' : 'off'}" data-name="${source.name}">
+                        ${active ? 'Вимкнути' : 'Увімкнути'}
+                    </div>
+                </div>`;
+            });
 
-    function initSettings() {
+            html += '</div>';
 
-        var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
-        if (!SettingsApi || !SettingsApi.addComponent) return;
+            Lampa.Modal.open({
+                title: 'Мультибалансер',
+                html: html,
+                onBack: function () {
+                    Lampa.Modal.close();
+                }
+            });
 
-        SettingsApi.addComponent({
-            component: 'multi_balancers',
-            name: 'Мій мультиплагін',
-            icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-        });
+            setTimeout(function () {
 
-        SettingsApi.addParam({
-            component: 'multi_balancers',
-            param: {
-                name: 'multi_manage',
-                type: 'button'
-            },
-            field: {
-                name: 'Керування балансерами'
-            },
-            onChange: function () {
-                openSourcesModal();
+                document.querySelectorAll('.balancer-btn').forEach(function (btn) {
+
+                    btn.addEventListener('click', function () {
+
+                        var name = this.dataset.name;
+                        var source = sources.find(function (s) { return s.name === name; });
+
+                        var active = getState(name);
+
+                        if (active) {
+                            setState(name, false);
+                            removeScript(source.url);
+                        } else {
+                            setState(name, true);
+                            injectScript(source.url);
+                        }
+
+                        showRestartModal();
+                    });
+                });
+
+            }, 300);
+        }
+
+        sources.forEach(function (source) {
+            if (getState(source.name)) {
+                injectScript(source.url);
             }
         });
-    }
 
-    // ==============================
-    // Старт
-    // ==============================
-
-    function start() {
-        loadActiveSources();
-        initSettings();
-        console.log('[MultiPlugin] Started');
-    }
-
-    if (Lampa.Listener) {
-        Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') start();
+        Lampa.SettingsApi.addParam({
+            component: 'plugins',
+            param: {
+                name: 'multiplugin_balancer',
+                type: 'button',
+                title: 'Мультибалансер',
+                description: 'Керування балансерами'
+            },
+            onChange: function () {
+                openMenu();
+            }
         });
-    } else {
-        start();
+
+        addStyles();
+    }
+
+    function addStyles() {
+
+        var style = document.createElement('style');
+
+        style.innerHTML = `
+        .balancer-item{
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:15px 20px;
+            margin-bottom:12px;
+            background:#1c1c1c;
+            border-radius:14px;
+            transition:0.3s;
+        }
+
+        .balancer-item:hover{
+            background:#262626;
+        }
+
+        .balancer-left{
+            display:flex;
+            align-items:center;
+        }
+
+        .balancer-name{
+            font-size:18px;
+        }
+
+        .balancer-dot{
+            width:12px;
+            height:12px;
+            border-radius:50%;
+            margin-right:10px;
+            background:#666;
+            transition:0.3s;
+        }
+
+        .balancer-dot.active{
+            background:#00ff88;
+            box-shadow:0 0 10px #00ff88;
+        }
+
+        .balancer-btn{
+            padding:8px 18px;
+            border-radius:20px;
+            font-weight:bold;
+            cursor:pointer;
+            transition:0.3s;
+        }
+
+        .balancer-btn.on{
+            background:#ff4444;
+            color:#fff;
+        }
+
+        .balancer-btn.off{
+            background:#00aa55;
+            color:#fff;
+        }
+
+        .balancer-btn:hover{
+            transform:scale(1.05);
+        }
+        `;
+
+        document.head.appendChild(style);
     }
 
 })();
