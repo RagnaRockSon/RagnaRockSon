@@ -97,27 +97,27 @@
         });
 
         // ==============================
-        // СТАБІЛЬНИЙ ПЕРЕЗАПУСК
+        // Кнопка застосувати зміни
         // ==============================
         applyButton.on('hover:enter', function () {
 
-    if (!changes) return;
+            if (!changes) return;
 
-    Lampa.Modal.confirm({
-        title: 'Перезапуск потрібен',
-        text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
-        yes: function () {
+            Lampa.Modal.confirm({
+                title: 'Перезапуск потрібен',
+                text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
+                yes: function () {
 
-            Lampa.Modal.close();
+                    Lampa.Modal.close();
 
-            setTimeout(function () {
-                window.location.href = window.location.href;
-            }, 300);
+                    // Soft reload Lampa 1.12.4
+                    setTimeout(function () {
+                        window.location.href = window.location.href;
+                    }, 300);
+                }
+            });
 
-        }
-    });
-
-});
+        });
 
         // ==============================
         // Кнопка Назад
