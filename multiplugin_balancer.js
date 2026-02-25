@@ -128,39 +128,38 @@
             container.append(item);
         });
 
-        applyButton.on('hover:enter', function () {
+       container.append(applyButton);
 
-            Lampa.Modal.open({
-                title: 'Перезапуск потрібен',
-                text: 'Застосувати зміни зараз?',
-                buttons: [
-                    {
-                        name: 'Так',
-                        onSelect: function () {
-                            location.reload();
-                        }
-                    },
-                    {
-                        name: 'Ні',
-                        onSelect: function () {
-                            Lampa.Modal.close();
-                        }
-                    }
-                ]
-            });
+Lampa.Modal.open({
+    title: 'Мультиплагін — Балансери',
+    html: container
+});
 
-        });
+// Реєструємо контролери для нових кнопок
+Lampa.Controller.collectionSet(container);
+Lampa.Controller.collectionFocus(container.find('.selector').first());
 
-        container.append(applyButton);
-
-        Lampa.Modal.open({
-            title: 'Мультиплагін — Балансери',
-            html: container
-        });
-
-        Lampa.Controller.collectionSet(container);
-        Lampa.Controller.collectionFocus(container.find('.selector').first());
-    }
+// Тепер обробник hover:enter спрацює
+applyButton.on('hover:enter', function () {
+    Lampa.Modal.open({
+        title: 'Перезапуск потрібен',
+        text: 'Застосувати зміни зараз?',
+        buttons: [
+            {
+                name: 'Так',
+                onSelect: function () {
+                    location.reload();
+                }
+            },
+            {
+                name: 'Ні',
+                onSelect: function () {
+                    Lampa.Modal.close();
+                }
+            }
+        ]
+    });
+});
 
     // ==============================
     // Додаємо в Налаштування
