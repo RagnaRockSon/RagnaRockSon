@@ -1,144 +1,155 @@
 (function () {
-    'use strict';
+
+    if (window.multi_balancer_ready) return;
+    window.multi_balancer_ready = true;
 
     var sources = [
-        { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
-        { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
-        { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
-        { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
+        { key: "baza", name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
+        { key: "bandera", name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
+        { key: "online_mod", name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
+        { key: "alpac", name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
-    function startPlugin() {
-        if (!window.Lampa) {
-            setTimeout(startPlugin, 500);
-            return;
-        }
+    function loadScript(url) {
+        var script = document.createElement('script');
+        script.src = url;
+        script.async = true;
+        document.body.appendChild(script);
+    }
 
-        Lampa.SettingsApi.addComponent({
-            component: 'multi_balancers',
-            name: 'Мультиплагін балансерів',
-            icon: '<svg viewBox="0 0 28 28"><rect width="28" height="28" fill="#156DD1"/></svg>'
+    function initActiveSources() {
+        sources.forEach(function (src) {
+            if (Lampa.Storage.get('multi_' + src.key, false)) {
+                loadScript(src.url);
+            }
         });
+    }
+
+    function openSourcesModal() {
+
+        var html = $('<div class="multi-balancers"></div>');
 
         sources.forEach(function (src) {
 
-            var storageKey = 'multi_' + src.name;
+            var storageKey = 'multi_' + src.key;
             var enabled = Lampa.Storage.get(storageKey, false);
 
-            Lampa.SettingsApi.addParam({
-                component: 'multi_balancers',
-                param: {
-                    name: src.name,
-                    type: 'button'
-                },
-                field: {
-                    name: src.name
-                },
-                onRender: function (item) {
+            var item = $(`
+                <div class="multi-item selector">
+                    <div class="multi-name">${src.name}</div>
+                    <div class="multi-toggle ${enabled ? 'enabled' : 'disabled'}">
+                        <div class="multi-dot"></div>
+                        <span>${enabled ? 'Увімкнено' : 'Вимкнено'}</span>
+                    </div>
+                </div>
+            `);
 
-                    var wrapper = item.find('.settings-param__name');
+            item.on('hover:enter', function () {
 
-                    wrapper.css({
-                        display: 'flex',
-                        justifyContent: 'space-between',
-                        alignItems: 'center',
-                        width: '100%',
-                        transition: 'all 0.3s ease'
-                    });
+                enabled = !enabled;
+                Lampa.Storage.set(storageKey, enabled);
 
-                    var statusDot = $('<div></div>').css({
-                        width: '10px',
-                        height: '10px',
-                        borderRadius: '50%',
-                        marginRight: '10px',
-                        transition: '0.3s'
-                    });
-
-                    var toggle = $('<div></div>').css({
-                        width: '50px',
-                        height: '22px',
-                        borderRadius: '20px',
-                        position: 'relative',
-                        transition: '0.3s',
-                        cursor: 'pointer'
-                    });
-
-                    var knob = $('<div></div>').css({
-                        width: '18px',
-                        height: '18px',
-                        borderRadius: '50%',
-                        position: 'absolute',
-                        top: '2px',
-                        transition: '0.3s'
-                    });
-
-                    toggle.append(knob);
-
-                    var left = $('<div></div>').css({
-                        display: 'flex',
-                        alignItems: 'center'
-                    });
-
-                    var nameText = $('<div>' + src.name + '</div>');
-
-                    left.append(statusDot);
-                    left.append(nameText);
-
-                    wrapper.html('');
-                    wrapper.append(left);
-                    wrapper.append(toggle);
-
-                    function updateUI() {
-                        if (enabled) {
-                            statusDot.css({ background: '#46b85a' });
-                            toggle.css({ background: '#46b85a' });
-                            knob.css({ left: '28px', background: '#fff' });
-                        } else {
-                            statusDot.css({ background: '#d24a4a' });
-                            toggle.css({ background: '#444' });
-                            knob.css({ left: '2px', background: '#ccc' });
+                Lampa.Modal.open({
+                    title: 'Перезапуск потрібен',
+                    text: src.name + ': зміни застосуються після перезапуску Lampa.',
+                    buttons: [
+                        {
+                            name: 'Перезапустити',
+                            onSelect: function () {
+                                location.reload();
+                            }
+                        },
+                        {
+                            name: 'Пізніше',
+                            onSelect: function () {
+                                Lampa.Modal.close();
+                            }
                         }
-                    }
+                    ]
+                });
 
-                    updateUI();
-
-                    item.on('hover:enter', function () {
-
-                        enabled = !enabled;
-                        Lampa.Storage.set(storageKey, enabled);
-
-                        if (enabled) {
-                            var script = document.createElement('script');
-                            script.src = src.url;
-                            script.async = false;
-                            script.setAttribute('data-balancer', src.name);
-                            document.body.appendChild(script);
-                            Lampa.Noty.show(src.name + ' підключено');
-                        } else {
-                            $('script[data-balancer="' + src.name + '"]').remove();
-                            Lampa.Noty.show(src.name + ' вимкнено');
-                        }
-
-                        updateUI();
-                    });
-
-                }
             });
 
-            // автопідключення при запуску
-            if (enabled) {
-                var script = document.createElement('script');
-                script.src = src.url;
-                script.async = false;
-                script.setAttribute('data-balancer', src.name);
-                document.body.appendChild(script);
-            }
-
+            html.append(item);
         });
 
-        Lampa.Noty.show('Мультиплагін активний');
+        Lampa.Modal.open({
+            title: 'Мульти Балансери',
+            html: html,
+            size: 'medium'
+        });
     }
 
-    startPlugin();
+    function initSettings() {
+
+        if (!Lampa.SettingsApi || !Lampa.SettingsApi.addComponent) return;
+
+        Lampa.SettingsApi.addComponent({
+            component: 'multi_balancer',
+            name: 'Мульти Балансери',
+            icon: '<svg width="20" height="20" viewBox="0 0 24 24" fill="currentColor"><circle cx="6" cy="12" r="3"/><circle cx="18" cy="12" r="3"/></svg>'
+        });
+
+        Lampa.SettingsApi.addParam({
+            component: 'multi_balancer',
+            param: {
+                name: 'open_sources',
+                type: 'button'
+            },
+            field: {
+                name: 'Керування джерелами'
+            },
+            onChange: function () {
+                openSourcesModal();
+            }
+        });
+    }
+
+    function addStyles() {
+        $('body').append(`
+            <style>
+            .multi-item {
+                display:flex;
+                justify-content:space-between;
+                align-items:center;
+                padding:1em;
+                background:rgba(255,255,255,0.05);
+                border-radius:.5em;
+                margin-bottom:1em;
+                transition:0.25s;
+            }
+            .multi-item.focus {
+                background:rgba(255,255,255,0.15);
+                transform:scale(1.03);
+            }
+            .multi-toggle {
+                display:flex;
+                align-items:center;
+                gap:.6em;
+                font-weight:bold;
+                transition:0.3s;
+            }
+            .multi-dot {
+                width:10px;
+                height:10px;
+                border-radius:50%;
+                transition:0.3s;
+            }
+            .multi-toggle.enabled span { color:#46b85a; }
+            .multi-toggle.enabled .multi-dot { background:#46b85a; }
+            .multi-toggle.disabled span { color:#d24a4a; }
+            .multi-toggle.disabled .multi-dot { background:#d24a4a; }
+            </style>
+        `);
+    }
+
+    function start() {
+        addStyles();
+        initSettings();
+        initActiveSources();
+    }
+
+    if (window.Lampa) start();
+    else document.addEventListener('lampa', start);
 
 })();
