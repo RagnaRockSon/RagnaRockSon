@@ -1,39 +1,42 @@
 (function() {
     'use strict';
 
-    // ================================
-    // Джерела / балансери
-    // ================================
+    var pluginName = 'my_multi_plugin';
+
     var sources = [
-        {name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js", enabled: true},
-        {name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js", enabled: true},
-        {name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js", enabled: true},
-        {name: "Alpac Beta", url: "http://beta.l-vid.online/online.js", enabled: true}
+        {name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js"},
+        {name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js"},
+        {name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js"},
+        {name: "Alpac Beta", url: "http://beta.l-vid.online/online.js"}
     ];
 
     // ================================
-    // Завантаження скриптів
+    // Завантаження скрипту
     // ================================
     function loadSource(src){
         try {
             var script = document.createElement('script');
             script.src = src.url;
-            script.async = false; // порядок підключення
+            script.async = false;
             document.body.appendChild(script);
+            Lampa.Noty.show('Підключено: ' + src.name);
         } catch(e){
             console.warn('Помилка підключення', src.name);
         }
     }
 
+    // ================================
+    // Завантаження всіх активних джерел
+    // ================================
     function loadActiveSources(){
-        sources.forEach(function(src){
-            if(src.enabled) loadSource(src);
+        sources.forEach(function(src, i){
+            var enabled = Lampa.Storage.get(pluginName+'_'+i, true);
+            if(enabled) loadSource(src);
         });
-        Lampa.Noty.show('Активні балансери підключено');
     }
 
     // ================================
-    // Налаштування в меню Lampa
+    // Ініціалізація налаштувань з індикаторами
     // ================================
     function initSettings() {
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
@@ -41,89 +44,89 @@
 
         // Компонент плагіна
         SettingsApi.addComponent({
-            component: 'my_multi_plugin',
+            component: pluginName,
             name: 'Мій Мультиплагін',
             icon: '<svg viewBox="0 0 28 28"><rect width="28" height="28" fill="currentColor"/></svg>'
         });
 
-        // Чекбокси для джерел
+        // Чекбокси для джерел з індикаторами
         sources.forEach(function(src, i){
+            var storageKey = pluginName+'_'+i;
+            var stored = Lampa.Storage.get(storageKey, true);
+
             SettingsApi.addParam({
-                component: 'my_multi_plugin',
+                component: pluginName,
                 param: {name: 'source_'+i, type: 'switch'},
                 field: {name: src.name},
+                value: stored,
                 onChange: function(value){
-                    src.enabled = value;
+                    Lampa.Storage.set(storageKey, value);
+                    if(value){
+                        loadSource(src);
+                        updateIndicator(i, true);
+                    } else {
+                        updateIndicator(i, false);
+                    }
                 }
             });
+
+            // Додаємо індикатор поруч
+            addIndicator(i, stored);
         });
 
-        // Кнопка підключення активних джерел
+        // Кнопка для підключення всіх активних
         SettingsApi.addParam({
-            component: 'my_multi_plugin',
+            component: pluginName,
             param: {name: 'load_sources', type: 'button'},
             field: {name: 'Підключити активні балансери'},
             onChange: function(){
                 loadActiveSources();
+                updateAllIndicators();
             }
         });
     }
 
     // ================================
-    // Компонент для пошуку фільмів/серіалів
+    // Функції для індикаторів
     // ================================
-    function initSearchComponent(){
-        Lampa.Component.add('my_multi_plugin_search', {
-            template: `
-                <div style="padding: 20px;">
-                    <h2>Пошук фільмів/серіалів:</h2>
-                    <input v-model="query" placeholder="Введіть назву..." @keyup.enter="searchAll"/>
-                    <ul>
-                        <li v-for="item in results" @click="open(item)">
-                            {{ item.name }} - {{ item.source }}
-                        </li>
-                    </ul>
-                </div>
-            `,
-            data: function() {
-                return {
-                    query: '',
-                    results: []
-                };
-            },
-            methods: {
-                searchAll: function() {
-                    var self = this;
-                    self.results = [];
+    function addIndicator(index, enabled){
+        var componentId = pluginName+'_source_'+index+'_indicator';
+        var indicator = $('<span class="source-indicator" id="'+componentId+'">'+(enabled?'Увімкнено':'Вимкнено')+'</span>');
+        indicator.css({
+            display: 'inline-block',
+            padding: '0 6px',
+            marginLeft: '10px',
+            fontSize: '0.85em',
+            color: '#fff',
+            backgroundColor: enabled ? '#46b85a' : '#d24a4a',
+            borderRadius: '3px'
+        });
+        $('.settings-component-item[data-component="'+pluginName+'"]').find('.settings-param').eq(index).append(indicator);
+    }
 
-                    // Показуємо всі підключені джерела
-                    sources.forEach(function(src){
-                        if(src.enabled){
-                            self.results.push({
-                                name: "Пошук через " + src.name,
-                                url: src.url,
-                                source: src.name
-                            });
-                        }
-                    });
+    function updateIndicator(index, enabled){
+        var componentId = pluginName+'_source_'+index+'_indicator';
+        var el = $('#'+componentId);
+        if(el.length){
+            el.text(enabled?'Увімкнено':'Вимкнено');
+            el.css('background-color', enabled ? '#46b85a' : '#d24a4a');
+        }
+    }
 
-                    Lampa.Noty.show('Результати пошуку сформовано');
-                },
-                open: function(item) {
-                    Lampa.Noty.show('Відкриваємо джерело: ' + item.name);
-                    // Тут можна додати Lampa.Player.open(item.url)
-                }
-            }
+    function updateAllIndicators(){
+        sources.forEach(function(src, i){
+            var enabled = Lampa.Storage.get(pluginName+'_'+i, true);
+            updateIndicator(i, enabled);
         });
     }
 
     // ================================
-    // Очікування Lampa перед ініціалізацією
+    // Старт плагіна
     // ================================
     function startPlugin(){
         waitForLampa(function(){
             initSettings();
-            initSearchComponent();
+            loadActiveSources(); // завантажити активні джерела автоматично
         });
     }
 
