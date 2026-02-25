@@ -15,7 +15,7 @@
         }
 
         Lampa.SettingsApi.addComponent({
-            component: 'multi_plugin',
+            component: 'multi_balancers',
             name: 'Мультиплагін балансерів',
             icon: '<svg viewBox="0 0 28 28"><rect width="28" height="28" fill="#156DD1"/></svg>'
         });
@@ -26,7 +26,7 @@
             var enabled = Lampa.Storage.get(storageKey, false);
 
             Lampa.SettingsApi.addParam({
-                component: 'multi_plugin',
+                component: 'multi_balancers',
                 param: {
                     name: src.name,
                     type: 'button'
@@ -36,25 +36,67 @@
                 },
                 onRender: function (item) {
 
-                    var button = item.find('.settings-param__name');
+                    var wrapper = item.find('.settings-param__name');
+
+                    wrapper.css({
+                        display: 'flex',
+                        justifyContent: 'space-between',
+                        alignItems: 'center',
+                        width: '100%',
+                        transition: 'all 0.3s ease'
+                    });
+
+                    var statusDot = $('<div></div>').css({
+                        width: '10px',
+                        height: '10px',
+                        borderRadius: '50%',
+                        marginRight: '10px',
+                        transition: '0.3s'
+                    });
+
+                    var toggle = $('<div></div>').css({
+                        width: '50px',
+                        height: '22px',
+                        borderRadius: '20px',
+                        position: 'relative',
+                        transition: '0.3s',
+                        cursor: 'pointer'
+                    });
+
+                    var knob = $('<div></div>').css({
+                        width: '18px',
+                        height: '18px',
+                        borderRadius: '50%',
+                        position: 'absolute',
+                        top: '2px',
+                        transition: '0.3s'
+                    });
+
+                    toggle.append(knob);
+
+                    var left = $('<div></div>').css({
+                        display: 'flex',
+                        alignItems: 'center'
+                    });
+
+                    var nameText = $('<div>' + src.name + '</div>');
+
+                    left.append(statusDot);
+                    left.append(nameText);
+
+                    wrapper.html('');
+                    wrapper.append(left);
+                    wrapper.append(toggle);
 
                     function updateUI() {
                         if (enabled) {
-                            button.text(src.name + ' — Вимкнути');
-                            button.css({
-                                background: '#46b85a',
-                                color: '#fff',
-                                padding: '6px 10px',
-                                borderRadius: '6px'
-                            });
+                            statusDot.css({ background: '#46b85a' });
+                            toggle.css({ background: '#46b85a' });
+                            knob.css({ left: '28px', background: '#fff' });
                         } else {
-                            button.text(src.name + ' — Увімкнути');
-                            button.css({
-                                background: '#d24a4a',
-                                color: '#fff',
-                                padding: '6px 10px',
-                                borderRadius: '6px'
-                            });
+                            statusDot.css({ background: '#d24a4a' });
+                            toggle.css({ background: '#444' });
+                            knob.css({ left: '2px', background: '#ccc' });
                         }
                     }
 
@@ -69,22 +111,26 @@
                             var script = document.createElement('script');
                             script.src = src.url;
                             script.async = false;
+                            script.setAttribute('data-balancer', src.name);
                             document.body.appendChild(script);
                             Lampa.Noty.show(src.name + ' підключено');
                         } else {
-                            Lampa.Noty.show(src.name + ' вимкнено (перезапуск Lampa для повного відключення)');
+                            $('script[data-balancer="' + src.name + '"]').remove();
+                            Lampa.Noty.show(src.name + ' вимкнено');
                         }
 
                         updateUI();
                     });
+
                 }
             });
 
-            // автопідключення якщо увімкнений
+            // автопідключення при запуску
             if (enabled) {
                 var script = document.createElement('script');
                 script.src = src.url;
                 script.async = false;
+                script.setAttribute('data-balancer', src.name);
                 document.body.appendChild(script);
             }
 
