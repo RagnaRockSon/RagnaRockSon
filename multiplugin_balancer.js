@@ -99,26 +99,23 @@
         // ==============================
         // Кнопка застосувати зміни
         // ==============================
-        applyButton.on('hover:enter', function () {
-
-            if (!changes) return;
-
-            Lampa.Modal.confirm({
-                title: 'Перезапуск потрібен',
-                text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
-                yes: function () {
-
-                    Lampa.Modal.close();
-
-                    // Soft reload Lampa 1.12.4
-                    setTimeout(function () {
-                        window.location.href = window.location.href;
-                    }, 300);
-                }
-            });
-
-        });
-
+        applyButton.on('hover:enter', function () {  
+        if (Lampa.Modal && Lampa.Modal.confirm) {  
+            Lampa.Modal.confirm({  
+                title: 'Перезапуск потрібен',  
+                text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',  
+                yes: function () {  
+                    if (Lampa.Manifest.app_reload) {  
+                        Lampa.Manifest.app_reload();  
+                    } else {  
+                        location.reload();  
+                    }  
+                }  
+            });  
+        } else {  
+            location.reload();  
+        }  
+    });  
         // ==============================
         // Кнопка Назад
         // ==============================
