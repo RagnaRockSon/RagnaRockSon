@@ -57,25 +57,17 @@
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
-        // ==============================
         // Функція закриття модалі
-        // ==============================
         function closeModal() {
-            // Закриваємо модаль балансерів
-            if (Lampa.Modal && Lampa.Modal.close) {
-                Lampa.Modal.close();
-            }
+            if (Lampa.Modal && Lampa.Modal.close) Lampa.Modal.close();
             $(document).off('click.multiPluginOutside');
 
-            // Видаляємо BACK контролер
             if (Lampa.Controller && Lampa.Controller.remove) {
                 Lampa.Controller.remove('back');
             }
         }
 
-        // ==============================
         // Клік поза контейнером
-        // ==============================
         setTimeout(function () {
             $(document).on('click.multiPluginOutside', function(e) {
                 if (!$(e.target).closest('.multi-container').length) {
@@ -84,9 +76,7 @@
             });
         }, 100);
 
-        // ==============================
         // Додаємо джерела
-        // ==============================
         sources.forEach(function (src) {
             var storageKey = 'multi_' + src.name;
             var enabled = Lampa.Storage.get(storageKey, false);
@@ -116,9 +106,7 @@
             container.append(item);
         });
 
-        // ==============================
         // Кнопка застосувати зміни
-        // ==============================
         applyButton.on('hover:enter', function () {  
             if (Lampa.Modal && Lampa.Modal.confirm) {  
                 Lampa.Modal.confirm({  
@@ -136,20 +124,16 @@
             } else {  
                 location.reload();  
             }  
-        });  
+        });
 
-        // ==============================
         // Кнопка Назад
-        // ==============================
         backButton.on('hover:enter', function () {
             closeModal();
         });
 
         container.append(applyButton).append(backButton);
 
-        // ==============================
         // Відкриваємо модаль
-        // ==============================
         Lampa.Modal.open({
             title: 'Мультиплагін — Балансери',
             html: container
@@ -158,9 +142,7 @@
         Lampa.Controller.collectionSet(container);
         Lampa.Controller.collectionFocus(container.find('.selector').first());
 
-        // ==============================
         // BACK на пульті
-        // ==============================
         if (Lampa.Controller && Lampa.Controller.add) {
             Lampa.Controller.add('back', function() {
                 closeModal();
@@ -187,6 +169,18 @@
             field: { name: 'Керування балансерами' },
             onChange: function () {
                 openSourcesModal();
+
+                // ==============================
+                // BACK для меню плагіна
+                // ==============================
+                if (Lampa.Controller && Lampa.Controller.add) {
+                    Lampa.Controller.add('back', function() {
+                        // Закриваємо меню плагіна і повертаємось у головне меню налаштувань
+                        if (SettingsApi.close && typeof SettingsApi.close === 'function') {
+                            SettingsApi.close();
+                        }
+                    });
+                }
             }
         });
     }
