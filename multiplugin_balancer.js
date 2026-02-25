@@ -1,7 +1,7 @@
 (function() {
     'use strict';
 
-    var pluginName = 'my_multi_plugin';
+    var pluginName = 'my_multi_plugin_buttons';
 
     var sources = [
         {name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js"},
@@ -26,98 +26,48 @@
     }
 
     // ================================
-    // Завантаження всіх активних джерел
-    // ================================
-    function loadActiveSources(){
-        sources.forEach(function(src, i){
-            var enabled = Lampa.Storage.get(pluginName+'_'+i, true);
-            if(enabled) loadSource(src);
-        });
-    }
-
-    // ================================
-    // Ініціалізація налаштувань з індикаторами
+    // Створення кнопок у меню
     // ================================
     function initSettings() {
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
         if(!SettingsApi || !SettingsApi.addComponent) return;
 
-        // Компонент плагіна
+        // Додати компонент
         SettingsApi.addComponent({
             component: pluginName,
-            name: 'Мій Мультиплагін',
+            name: 'Мій Мультиплагін (кнопки)',
             icon: '<svg viewBox="0 0 28 28"><rect width="28" height="28" fill="currentColor"/></svg>'
         });
 
-        // Чекбокси для джерел з індикаторами
+        // Додаємо кнопки для кожного джерела
         sources.forEach(function(src, i){
             var storageKey = pluginName+'_'+i;
-            var stored = Lampa.Storage.get(storageKey, true);
+            var enabled = Lampa.Storage.get(storageKey, false);
 
             SettingsApi.addParam({
                 component: pluginName,
-                param: {name: 'source_'+i, type: 'switch'},
-                field: {name: src.name},
-                value: stored,
-                onChange: function(value){
-                    Lampa.Storage.set(storageKey, value);
-                    if(value){
-                        loadSource(src);
-                        updateIndicator(i, true);
-                    } else {
-                        updateIndicator(i, false);
-                    }
+                param: {name: 'source_'+i, type: 'button'},
+                field: {name: src.name + ' [' + (enabled?'Увімкнено':'Вимкнено') + ']'},
+                onChange: function(){
+                    enabled = !enabled;
+                    Lampa.Storage.set(storageKey, enabled);
+                    updateButton(i, enabled);
+                    if(enabled) loadSource(src);
                 }
             });
-
-            // Додаємо індикатор поруч
-            addIndicator(i, stored);
-        });
-
-        // Кнопка для підключення всіх активних
-        SettingsApi.addParam({
-            component: pluginName,
-            param: {name: 'load_sources', type: 'button'},
-            field: {name: 'Підключити активні балансери'},
-            onChange: function(){
-                loadActiveSources();
-                updateAllIndicators();
-            }
         });
     }
 
     // ================================
-    // Функції для індикаторів
+    // Оновлення кнопки
     // ================================
-    function addIndicator(index, enabled){
-        var componentId = pluginName+'_source_'+index+'_indicator';
-        var indicator = $('<span class="source-indicator" id="'+componentId+'">'+(enabled?'Увімкнено':'Вимкнено')+'</span>');
-        indicator.css({
-            display: 'inline-block',
-            padding: '0 6px',
-            marginLeft: '10px',
-            fontSize: '0.85em',
-            color: '#fff',
-            backgroundColor: enabled ? '#46b85a' : '#d24a4a',
-            borderRadius: '3px'
-        });
-        $('.settings-component-item[data-component="'+pluginName+'"]').find('.settings-param').eq(index).append(indicator);
-    }
-
-    function updateIndicator(index, enabled){
-        var componentId = pluginName+'_source_'+index+'_indicator';
-        var el = $('#'+componentId);
-        if(el.length){
-            el.text(enabled?'Увімкнено':'Вимкнено');
-            el.css('background-color', enabled ? '#46b85a' : '#d24a4a');
+    function updateButton(index, enabled){
+        var btn = $('.settings-component-item[data-component="'+pluginName+'"]').find('.settings-param').eq(index);
+        if(btn.length){
+            var name = sources[index].name + ' [' + (enabled?'Увімкнено':'Вимкнено') + ']';
+            btn.find('.settings-param__name').text(name);
+            btn.css('background-color', enabled ? '#46b85a' : '#d24a4a');
         }
-    }
-
-    function updateAllIndicators(){
-        sources.forEach(function(src, i){
-            var enabled = Lampa.Storage.get(pluginName+'_'+i, true);
-            updateIndicator(i, enabled);
-        });
     }
 
     // ================================
@@ -126,7 +76,13 @@
     function startPlugin(){
         waitForLampa(function(){
             initSettings();
-            loadActiveSources(); // завантажити активні джерела автоматично
+            // Завантажити активні джерела
+            sources.forEach(function(src, i){
+                if(Lampa.Storage.get(pluginName+'_'+i, false)){
+                    loadSource(src);
+                    updateButton(i, true);
+                }
+            });
         });
     }
 
