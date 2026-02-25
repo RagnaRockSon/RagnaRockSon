@@ -10,68 +10,33 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
+    var modalState = {
+        isOpen: false,
+        outsideClickHandler: null,
+        container: null
+    };
+
     // ==============================
-    // CSS
+    // Додаємо CSS
     // ==============================
-    var stylesAdded = false;
-    
-    function addStyles() {
-        if (stylesAdded) return;
-        
-        var style = $('<style id="multi-plugin-styles"></style>');
-        style.text(`
-            .multi-container { padding: 20px; }
-            .multi-item { 
-                display: flex; 
-                justify-content: space-between; 
-                align-items: center; 
-                padding: 15px; 
-                margin-bottom: 10px; 
-                background: rgba(255, 255, 255, 0.05); 
-                border-radius: 10px; 
-                transition: 0.3s;
-            }
-            .multi-item.focus { 
-                background: rgba(255, 255, 255, 0.1); 
-                transform: scale(1.02);
-            }
-            .multi-toggle { 
-                padding: 6px 14px; 
-                border-radius: 20px; 
-                font-weight: bold; 
-                min-width: 120px; 
-                text-align: center; 
-                cursor: pointer; 
-                transition: all 0.4s ease; 
-                color: #fff;
-            }
-            .multi-toggle.enabled { 
-                background: #46b85a; 
-                box-shadow: 0 0 8px #46b85a;
-            }
-            .multi-toggle.disabled { 
-                background: #d24a4a; 
-                box-shadow: 0 0 8px #d24a4a;
-            }
-            .multi-apply, .multi-back { 
-                text-align: center; 
-                margin-top: 15px; 
-                padding: 15px; 
-                border-radius: 10px; 
-                font-weight: bold; 
-                cursor: pointer; 
-                transition: all 0.3s; 
-                color: #fff;
-            }
-            .multi-apply { background: #156DD1; }
-            .multi-apply:hover { background: #1f82ff; }
-            .multi-back { background: #777; }
-            .multi-back:hover { background: #999; }
-        `);
-        
-        $('body').append(style);
-        stylesAdded = true;
-        console.log('[MultiPlugin] Styles added');
+    function injectCSS() {
+        if (document.getElementById('multi-plugin-styles')) return;
+        var style = document.createElement('style');
+        style.id = 'multi-plugin-styles';
+        style.textContent = `
+            .multi-container { padding:20px; position: relative; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
+            .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
+            .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; min-width:120px; text-align:center; cursor:pointer; transition: all 0.4s ease; color:#fff; }
+            .multi-toggle.enabled { background:#46b85a; box-shadow: 0 0 8px #46b85a; }
+            .multi-toggle.disabled { background:#d24a4a; box-shadow: 0 0 8px #d24a4a; }
+            .multi-apply, .multi-back { text-align:center; margin-top:15px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; transition: all 0.3s; color:#fff; }
+            .multi-apply { background:#156DD1; }
+            .multi-apply:hover { background:#1f82ff; transform:scale(1.03); }
+            .multi-back { background:#777; }
+            .multi-back:hover { background:#999; transform:scale(1.03); }
+        `;
+        document.head.appendChild(style);
     }
 
     // ==============================
@@ -79,20 +44,14 @@
     // ==============================
     function loadActiveSources() {
         sources.forEach(function (src) {
-            var storageKey = 'multi_' + src.name;
-            var enabled = Lampa.Storage.get(storageKey, false);
-            
+            var enabled = Lampa.Storage.get('multi_' + src.name, false);
             if (!enabled) return;
-
-            // Перевіряємо, чи вже завантажений
-            if (document.querySelector('script[src="' + src.url + '"]')) {
-                console.log('[MultiPlugin] Already loaded:', src.name);
-                return;
-            }
+            if (document.querySelector('script[src="' + src.url + '"]')) return;
 
             var script = document.createElement('script');
             script.src = src.url;
             script.async = false;
+            script.onerror = function() { console.error('[MultiPlugin] Failed to load:', src.name); };
             document.body.appendChild(script);
 
             console.log('[MultiPlugin] Loaded:', src.name);
@@ -100,153 +59,145 @@
     }
 
     // ==============================
-    // Відкриття модалі
+    // Відкриття модального вікна балансерів
     // ==============================
-    function openModal() {
-        var html = $('<div class="multi-container"></div>');
+    function openSourcesModal() {
+        if (modalState.isOpen) return;
+
+        modalState.isOpen = true;
+        var container = $('<div class="multi-container"></div>');
+        var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
+        var backButton = $('<div class="multi-back selector">Назад</div>');
+        modalState.container = container;
+
         var hasChanges = false;
 
-        // Елементи джерел
+        // Клік поза контейнером закриває модаль
+        modalState.outsideClickHandler = function(e) {
+            var $target = $(e.target);
+            if (!$target.closest('.multi-container').length && !$target.closest('.lampa-modal, .modal, [class*="modal"]').length) {
+                closeModal();
+            }
+        };
+        setTimeout(() => $(document).on('click.multiPluginOutside', modalState.outsideClickHandler), 100);
+
+        // Закриття модалі
+        function closeModal() {
+            modalState.isOpen = false;
+            if (Lampa.Modal && Lampa.Modal.close) Lampa.Modal.close();
+            if (modalState.outsideClickHandler) $(document).off('click.multiPluginOutside', modalState.outsideClickHandler);
+            modalState.container = null;
+        }
+
+        // Додаємо джерела
         sources.forEach(function (src) {
             var storageKey = 'multi_' + src.name;
             var enabled = Lampa.Storage.get(storageKey, false);
-
-            var item = $('<div class="multi-item selector"></div>');
-            var nameDiv = $('<div></div>').text(src.name);
-            var toggleDiv = $('<div class="multi-toggle"></div>')
-                .addClass(enabled ? 'enabled' : 'disabled')
-                .text(enabled ? 'Увімкнено' : 'Вимкнено');
-
-            item.append(nameDiv).append(toggleDiv);
+            var item = $(`
+                <div class="multi-item selector">
+                    <div>${src.name}</div>
+                    <div class="multi-toggle ${enabled ? 'enabled' : 'disabled'}">
+                        ${enabled ? 'Увімкнено' : 'Вимкнено'}
+                    </div>
+                </div>
+            `);
 
             item.on('hover:enter', function () {
                 enabled = !enabled;
                 Lampa.Storage.set(storageKey, enabled);
-                
-                toggleDiv
+                item.find('.multi-toggle')
                     .removeClass('enabled disabled')
                     .addClass(enabled ? 'enabled' : 'disabled')
                     .text(enabled ? 'Увімкнено' : 'Вимкнено');
-                
                 hasChanges = true;
-                applyBtn.show();
-
-                console.log('[MultiPlugin] Toggled:', src.name, 'to', enabled);
+                applyButton.show();
             });
 
-            html.append(item);
+            container.append(item);
         });
 
-        // Кнопка застосувати
-        var applyBtn = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
-        
-        applyBtn.on('hover:enter', function () {
-            if (!hasChanges) return;
-            
-            Lampa.Modal.confirm({
-                title: 'Перезапуск потрібен',
-                text: 'Lampa буде перезавантажена. Продовжити?',
-                yes: function () {
-                    if (Lampa.Manifest && Lampa.Manifest.app_reload) {
-                        Lampa.Manifest.app_reload();
-                    } else {
-                        location.reload();
+        // Кнопка застосувати зміни
+        applyButton.on('hover:enter', function () {
+            if (hasChanges && Lampa.Modal && Lampa.Modal.confirm) {
+                Lampa.Modal.confirm({
+                    title: 'Перезапуск потрібен',
+                    text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
+                    yes: function () {
+                        closeModal();
+                        if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') Lampa.Manifest.app_reload();
+                        else location.reload();
                     }
-                }
-            });
-        });
-
-        // Кнопка назад
-        var backBtn = $('<div class="multi-back selector">Назад</div>');
-        
-        backBtn.on('hover:enter', function () {
-            Lampa.Modal.close();
-        });
-
-        html.append(applyBtn).append(backBtn);
-
-        // Відкриваємо модаль
-        Lampa.Modal.open({
-            title: 'Мультиплагін — Балансери',
-            html: html
-        });
-
-        // Встановлюємо фокус
-        if (Lampa.Controller && Lampa.Controller.collectionSet) {
-            try {
-                Lampa.Controller.collectionSet(html);
-                Lampa.Controller.collectionFocus(html.find('.selector').first());
-            } catch (e) {
-                console.log('[MultiPlugin] Controller error:', e.message);
+                });
             }
+        });
+
+        // Кнопка Назад
+        backButton.on('hover:enter', closeModal);
+
+        container.append(applyButton).append(backButton);
+
+        if (Lampa.Modal && Lampa.Modal.open) {
+            Lampa.Modal.open({ title: 'Мультиплагін — Балансери', html: container });
         }
 
-        console.log('[MultiPlugin] Modal opened');
+        if (Lampa.Controller && Lampa.Controller.collectionSet) {
+            Lampa.Controller.collectionSet(container);
+            var firstSelector = container.find('.selector').first();
+            if (firstSelector && firstSelector.length) Lampa.Controller.collectionFocus(firstSelector);
+        }
+
+        // Back кнопка на пульті
+        if (Lampa.Controller && Lampa.Controller.add && typeof Lampa.Controller.add === 'function') {
+            Lampa.Controller.add('back', closeModal);
+        }
     }
 
     // ==============================
-    // Ініціалізація налаштувань
+    // Додаємо плагін у налаштування
     // ==============================
     function initSettings() {
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
-        
-        if (!SettingsApi) {
-            console.warn('[MultiPlugin] SettingsApi not found');
-            return;
-        }
+        if (!SettingsApi || typeof SettingsApi.addComponent !== 'function') return;
 
-        try {
-            // Додаємо компонент
-            if (SettingsApi.addComponent) {
-                SettingsApi.addComponent({
-                    component: 'multi_balancers',
-                    name: 'Мультиплагін',
-                    icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-                });
-            }
+        SettingsApi.addComponent({
+            component: 'multi_balancers',
+            name: 'Мій мультиплагін',
+            icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
+        });
 
-            // Кнопка "Керування"
-            if (SettingsApi.addParam) {
-                SettingsApi.addParam({
-                    component: 'multi_balancers',
-                    param: { name: 'multi_manage', type: 'button' },
-                    field: { name: 'Керування балансерами' },
-                    onChange: function () {
-                        openModal();
-                    }
-                });
-            }
+        SettingsApi.addParam({
+            component: 'multi_balancers',
+            param: { name: 'multi_manage', type: 'button' },
+            field: { name: 'Керування балансерами' },
+            onChange: openSourcesModal
+        });
 
-            console.log('[MultiPlugin] Settings initialized');
-        } catch (e) {
-            console.error('[MultiPlugin] Error initializing settings:', e.message);
-        }
-    }
-
-    // ==============================
-    // Головна функція
-    // ==============================
-    function init() {
-        console.log('[MultiPlugin] Initializing...');
-        
-        addStyles();
-        loadActiveSources();
-        initSettings();
-        
-        console.log('[MultiPlugin] Ready');
-    }
-
-    // ==============================
-    // Старт при готовності Lampa
-    // ==============================
-    if (Lampa.Listener) {
-        Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') {
-                init();
+        SettingsApi.addParam({
+            component: 'multi_balancers',
+            param: { name: 'multi_back', type: 'button' },
+            field: { name: 'Назад' },
+            onChange: function () {
+                if (SettingsApi.close && typeof SettingsApi.close === 'function') SettingsApi.close();
             }
         });
+    }
+
+    // ==============================
+    // Старт плагіна
+    // ==============================
+    function start() {
+        injectCSS();
+        loadActiveSources();
+        initSettings();
+        console.log('[MultiPlugin] Запущено');
+    }
+
+    if (Lampa && Lampa.Listener && typeof Lampa.Listener.follow === 'function') {
+        Lampa.Listener.follow('app', function (e) {
+            if (e && e.type === 'ready') start();
+        });
     } else {
-        init();
+        document.addEventListener('DOMContentLoaded', start);
     }
 
 })();
