@@ -1,7 +1,9 @@
 (function() {
     'use strict';
 
+    // ================================
     // Балансери
+    // ================================
     var sources = [
         {name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js", enabled: true},
         {name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js", enabled: true},
@@ -11,13 +13,12 @@
 
     function startPlugin() {
         if(typeof window.Lampa === 'undefined' || !window.Lampa.Component) {
-            setTimeout(startPlugin, 500);
+            setTimeout(startPlugin, 1000);
             return;
         }
 
         Lampa.Noty.show('Мультиплагін активний!');
 
-        // Додаємо компонент у Lampa
         Lampa.Component.add('interactive_multi_plugin', {
             name: 'Інтерактивний мультиплагін',
             component: {
@@ -30,6 +31,8 @@
                             </li>
                         </ul>
 
+                        <button @click="reloadActiveScripts">Підключити активні балансери</button>
+
                         <h2>Пошук фільмів/серіалів:</h2>
                         <input v-model="query" placeholder="Введіть назву..." @keyup.enter="searchAll"/>
                         <ul>
@@ -37,8 +40,6 @@
                                 {{ item.name }} - {{ item.source }}
                             </li>
                         </ul>
-
-                        <button @click="reloadActiveScripts">Підключити активні балансери</button>
                     </div>
                 `,
                 data: function(){ 
@@ -49,7 +50,6 @@
                     };
                 },
                 methods: {
-                    // Пошук по активних балансерах
                     searchAll: function(){
                         var self = this;
                         self.results = [];
@@ -68,13 +68,9 @@
                             Lampa.Noty.show('Жоден балансер не активний!');
                         }
                     },
-
-                    // Відкриваємо плеєр (тут можна додати Lampa.Player)
                     open: function(item){
                         Lampa.Noty.show('Відкриваємо джерело: ' + item.source);
                     },
-
-                    // Підключаємо скрипти лише активних балансерів
                     reloadActiveScripts: function(){
                         var self = this;
                         self.sources.forEach(function(src){
