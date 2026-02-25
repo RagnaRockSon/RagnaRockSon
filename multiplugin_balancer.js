@@ -18,11 +18,14 @@
     .multi-container { padding:20px; }
     .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
     .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
-    .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; transition:0.3s; min-width:120px; text-align:center; cursor:pointer; }
-    .multi-toggle.enabled { background:#46b85a; }
-    .multi-toggle.disabled { background:#d24a4a; }
-    .multi-apply { text-align:center; margin-top:20px; padding:15px; background:#156DD1; border-radius:10px; font-weight:bold; transition:0.3s; cursor:pointer; }
-    .multi-apply.focus { background:#1f82ff; transform:scale(1.03); }
+    .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; min-width:120px; text-align:center; cursor:pointer; transition: all 0.4s ease; color:#fff; }
+    .multi-toggle.enabled { background:#46b85a; box-shadow: 0 0 8px #46b85a; }
+    .multi-toggle.disabled { background:#d24a4a; box-shadow: 0 0 8px #d24a4a; }
+    .multi-apply, .multi-back { text-align:center; margin-top:15px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; transition: all 0.3s; color:#fff; }
+    .multi-apply { background:#156DD1; }
+    .multi-apply:hover { background:#1f82ff; transform:scale(1.03); }
+    .multi-back { background:#777; }
+    .multi-back:hover { background:#999; transform:scale(1.03); }
     </style>
     `);
 
@@ -49,13 +52,12 @@
     // Модал керування
     // ==============================
     function openSourcesModal() {
-
         var changes = false;
         var container = $('<div class="multi-container"></div>');
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
+        var backButton = $('<div class="multi-back selector">Назад</div>');
 
         sources.forEach(function (src) {
-
             var storageKey = 'multi_' + src.name;
             var enabled = Lampa.Storage.get(storageKey, false);
 
@@ -69,10 +71,10 @@
             `);
 
             item.on('hover:enter', function () {
-
                 enabled = !enabled;
                 Lampa.Storage.set(storageKey, enabled);
 
+                // плавна анімація зміни кольору
                 item.find('.multi-toggle')
                     .removeClass('enabled disabled')
                     .addClass(enabled ? 'enabled' : 'disabled')
@@ -86,17 +88,14 @@
         });
 
         // ==============================
-        // Перезавантаження через внутрішній API Lampa
+        // Кнопка застосувати зміни
         // ==============================
         applyButton.on('hover:enter', function () {
-
-            // Виклик системного вікна перезавантаження
             if (Lampa.Modal && Lampa.Modal.confirm) {
                 Lampa.Modal.confirm({
                     title: 'Перезапуск потрібен',
                     text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
                     yes: function () {
-                        // Тут ми симулюємо системне перезавантаження
                         if (Lampa.Manifest.app_reload) {
                             Lampa.Manifest.app_reload();
                         } else {
@@ -105,13 +104,18 @@
                     }
                 });
             } else {
-                // fallback на звичайний reload
                 location.reload();
             }
-
         });
 
-        container.append(applyButton);
+        // ==============================
+        // Кнопка Назад
+        // ==============================
+        backButton.on('hover:enter', function () {
+            Lampa.Modal.close();
+        });
+
+        container.append(applyButton).append(backButton);
 
         Lampa.Modal.open({
             title: 'Мультиплагін — Балансери',
@@ -126,7 +130,6 @@
     // Додаємо в Налаштування
     // ==============================
     function initSettings() {
-
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
         if (!SettingsApi || !SettingsApi.addComponent) return;
 
