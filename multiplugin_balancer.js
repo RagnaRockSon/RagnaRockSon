@@ -52,10 +52,11 @@
     // Модал керування
     // ==============================
     function openSourcesModal() {
-        var changes = false;
         var container = $('<div class="multi-container"></div>');
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
+
+        var changes = false;
 
         // Закриття при кліку поза контейнером
         setTimeout(function () {
@@ -71,14 +72,12 @@
             var storageKey = 'multi_' + src.name;
             var enabled = Lampa.Storage.get(storageKey, false);
 
-            var item = $(` 
-                <div class="multi-item selector">
-                    <div>${src.name}</div>
-                    <div class="multi-toggle ${enabled ? 'enabled' : 'disabled'}">
-                        ${enabled ? 'Увімкнено' : 'Вимкнено'}
-                    </div>
+            var item = $(`<div class="multi-item selector">
+                <div>${src.name}</div>
+                <div class="multi-toggle ${enabled ? 'enabled' : 'disabled'}">
+                    ${enabled ? 'Увімкнено' : 'Вимкнено'}
                 </div>
-            `);
+            </div>`);
 
             item.on('hover:enter', function () {
                 enabled = !enabled;
@@ -96,26 +95,26 @@
             container.append(item);
         });
 
+        // ==============================
         // Кнопка застосувати зміни
+        // ==============================
         applyButton.on('hover:enter', function () {
-            if (Lampa.Modal && Lampa.Modal.confirm) {
-                Lampa.Modal.confirm({
-                    title: 'Перезапуск потрібен',
-                    text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
-                    yes: function () {
-                        if (Lampa.Manifest.app_reload) {
-                            Lampa.Manifest.app_reload();
-                        } else {
-                            location.reload();
-                        }
+            Lampa.Modal.confirm({
+                title: 'Перезапуск потрібен',
+                text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
+                yes: function () {
+                    if (Lampa.Manifest.app_reload) {
+                        Lampa.Manifest.app_reload();
+                    } else {
+                        location.reload();
                     }
-                });
-            } else {
-                location.reload();
-            }
+                }
+            });
         });
 
-        // Кнопка Назад в модальному
+        // ==============================
+        // Кнопка Назад у модальному меню
+        // ==============================
         backButton.on('hover:enter', function () {
             Lampa.Modal.close();
             $(document).off('click.multiPluginOutside');
@@ -130,6 +129,14 @@
 
         Lampa.Controller.collectionSet(container);
         Lampa.Controller.collectionFocus(container.find('.selector').first());
+
+        // Кнопка Back на пульті для модального меню
+        Lampa.Controller.add('back', function () {
+            if (Lampa.Modal.isOpen()) {
+                Lampa.Modal.close();
+                $(document).off('click.multiPluginOutside');
+            }
+        });
     }
 
     // ==============================
@@ -145,7 +152,6 @@
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
-        // Кнопка керування балансерами
         SettingsApi.addParam({
             component: 'multi_balancers',
             param: { name: 'multi_manage', type: 'button' },
@@ -155,13 +161,17 @@
             }
         });
 
-        // Кнопка назад у меню плагіна
+        // Back для меню плагіна
         SettingsApi.addParam({
             component: 'multi_balancers',
             param: { name: 'multi_back', type: 'button' },
             field: { name: 'Назад' },
             onChange: function () {
-                Lampa.Settings.close();
+                if (SettingsApi.close) {
+                    SettingsApi.close();
+                } else {
+                    console.log('[MultiPlugin] Close menu');
+                }
             }
         });
     }
