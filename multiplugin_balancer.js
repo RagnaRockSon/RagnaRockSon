@@ -101,23 +101,23 @@
         // ==============================
         applyButton.on('hover:enter', function () {
 
-            if (!changes) return;
+    if (!changes) return;
 
-            Lampa.Modal.confirm({
-                title: 'Перезапуск потрібен',
-                text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
-                yes: function () {
+    Lampa.Modal.confirm({
+        title: 'Перезапуск потрібен',
+        text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
+        yes: function () {
 
-                    if (Lampa.Listener) {
-                        Lampa.Listener.send('app', { type: 'reload' });
-                    } else {
-                        location.reload();
-                    }
+            Lampa.Modal.close();
 
-                }
-            });
+            setTimeout(function () {
+                window.location.href = window.location.href;
+            }, 300);
 
-        });
+        }
+    });
+
+});
 
         // ==============================
         // Кнопка Назад
