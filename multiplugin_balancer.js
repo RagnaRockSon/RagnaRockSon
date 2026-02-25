@@ -10,18 +10,17 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
-    var backControllerHandler = null;
     var modalState = {
         isOpen: false,
         outsideClickHandler: null,
-        container: null
+        container: null,
+        backKeyHandler: null
     };
 
     // ==============================
-    // CSS (ВИПРАВЛЕНО - додаємо один раз)
+    // CSS (додаємо один раз)
     // ==============================
     function injectCSS() {
-        // Перевіряємо, чи вже додали CSS
         if (document.getElementById('multi-plugin-styles')) return;
 
         var style = document.createElement('style');
@@ -50,7 +49,6 @@
             var enabled = Lampa.Storage.get('multi_' + src.name, false);
             if (!enabled) return;
 
-            // Перевірка, чи скрипт вже завантажений
             if (document.querySelector('script[src="' + src.url + '"]')) return;
 
             var script = document.createElement('script');
@@ -66,12 +64,38 @@
     }
 
     // ==============================
-    // Модал керування (ВИПРАВЛЕНО)
+    // Закриття модалі
+    // ==============================
+    function closeModal() {
+        if (!modalState.isOpen) return;
+
+        modalState.isOpen = false;
+
+        // Закриваємо Lampa Modal
+        if (Lampa.Modal && typeof Lampa.Modal.close === 'function') {
+            Lampa.Modal.close();
+        }
+
+        // Видаляємо обробник click
+        if (modalState.outsideClickHandler) {
+            $(document).off('click.multiPluginOutside');
+            modalState.outsideClickHandler = null;
+        }
+
+        // Очищуємо контейнер
+        if (modalState.container) {
+            modalState.container = null;
+        }
+
+        console.log('[MultiPlugin] Modal closed');
+    }
+
+    // ==============================
+    // Модал керування
     // ==============================
     function openSourcesModal() {
         // Закриваємо попередню модаль, якщо вона відкрита
         if (modalState.isOpen) {
-            closeModal();
             return;
         }
 
@@ -84,7 +108,7 @@
         modalState.container = container;
 
         // ==============================
-        // Обробник для кліку поза модаллю (ВИПРАВЛЕНО)
+        // Обробник для кліку поза модаллю
         // ==============================
         modalState.outsideClickHandler = function(e) {
             if (modalState.isOpen) {
@@ -98,38 +122,11 @@
             }
         };
 
-        // Додаємо обробник після затримки
         setTimeout(function () {
             if (modalState.isOpen) {
                 $(document).on('click.multiPluginOutside', modalState.outsideClickHandler);
             }
         }, 150);
-
-        // ==============================
-        // Функція закриття модалі (ВИПРАВЛЕНО)
-        // ==============================
-        function closeModal() {
-            modalState.isOpen = false;
-
-            // Закриваємо Lampa Modal
-            if (Lampa.Modal && Lampa.Modal.close) {
-                Lampa.Modal.close();
-            }
-
-            // Видаляємо обробник click
-            if (modalState.outsideClickHandler) {
-                $(document).off('click.multiPluginOutside', modalState.outsideClickHandler);
-                modalState.outsideClickHandler = null;
-            }
-
-            // Очищуємо контейнер
-            if (modalState.container) {
-                modalState.container = null;
-            }
-
-            // Видаляємо Back обробник (ВИПРАВЛЕНО - не використовуємо remove)
-            backControllerHandler = null;
-        }
 
         // ==============================
         // Додавання елементів джерел
@@ -194,7 +191,7 @@
         // ==============================
         // Відкриття модалі
         // ==============================
-        if (Lampa.Modal && Lampa.Modal.open) {
+        if (Lampa.Modal && typeof Lampa.Modal.open === 'function') {
             Lampa.Modal.open({
                 title: 'Мультиплагін — Балансери',
                 html: container
@@ -202,9 +199,9 @@
         }
 
         // ==============================
-        // Налаштування навігації (ВИПРАВЛЕНО)
+        // Налаштування навігації
         // ==============================
-        if (Lampa.Controller && Lampa.Controller.collectionSet) {
+        if (Lampa.Controller && typeof Lampa.Controller.collectionSet === 'function') {
             Lampa.Controller.collectionSet(container);
             var firstSelector = container.find('.selector').first();
             if (firstSelector && firstSelector.length) {
@@ -213,21 +210,29 @@
         }
 
         // ==============================
-        // Back контролер (ВИПРАВЛЕНО - без remove)
+        // Back контролер (ВИПРАВЛЕНО)
         // ==============================
-        if (Lampa.Controller && Lampa.Controller.add && typeof Lampa.Controller.add === 'function') {
-            // Створюємо обробник, який замикаємо в контексті модалі
-            var handleBackKey = function () {
-                if (modalState.isOpen && Lampa.Modal.isOpen && Lampa.Modal.isOpen()) {
+        if (Lampa.Controller) {
+            // Видаляємо старий обробник, якщо він існує
+            if (modalState.backKeyHandler) {
+                try {
+                    Lampa.Controller.remove && Lampa.Controller.remove(modalState.backKeyHandler);
+                } catch (e) {
+                    console.log('[MultiPlugin] Could not remove previous back handler');
+                }
+            }
+
+            // Створюємо новий обробник
+            modalState.backKeyHandler = function () {
+                if (modalState.isOpen) {
                     closeModal();
                 }
             };
 
-            // Зберігаємо посилання для можливого видалення
-            backControllerHandler = handleBackKey;
-
-            // Додаємо обробник (Lampa сам управляє обробниками)
-            Lampa.Controller.add('back', handleBackKey);
+            // Додаємо обробник
+            if (typeof Lampa.Controller.add === 'function') {
+                Lampa.Controller.add('back', modalState.backKeyHandler);
+            }
         }
     }
 
@@ -292,7 +297,6 @@
             }
         });
     } else {
-        // Резервна ініціалізація
         if (document.readyState === 'loading') {
             document.addEventListener('DOMContentLoaded', start);
         } else {
