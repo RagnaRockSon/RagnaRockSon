@@ -1,6 +1,9 @@
 (function() {
     'use strict';
 
+    // ================================
+    // Ваші балансери
+    // ================================
     var sources = [
         {name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js", enabled: true},
         {name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js", enabled: true},
@@ -9,36 +12,50 @@
     ];
 
     // ================================
-    // Функція для підключення активних балансерів
+    // Підключаємо балансери через Lampa
     // ================================
+    function loadSource(src){
+        try {
+            var script = document.createElement('script');
+            script.src = src.url;
+            script.async = false;
+            document.body.appendChild(script);
+            console.log('Балансер підключено:', src.name);
+        } catch(e){
+            console.warn('Помилка підключення балансера:', src.name, e);
+        }
+    }
+
     function loadActiveSources(){
         sources.forEach(function(src){
-            if(src.enabled){
-                try {
-                    var script = document.createElement('script');
-                    script.src = src.url;
-                    script.async = false;
-                    document.body.appendChild(script);
-                    console.log('Балансер підключено:', src.name);
-                } catch(e){
-                    console.warn('Помилка підключення балансера:', src.name, e);
-                }
-            }
+            if(src.enabled) loadSource(src);
         });
     }
 
     // ================================
-    // Створюємо компонент Lampa після готовності
+    // Чекаємо готовності Lampa
+    // ================================
+    function waitForLampa(callback){
+        if(typeof window.Lampa !== 'undefined' && window.Lampa.Component){
+            callback();
+        } else {
+            setTimeout(function(){ waitForLampa(callback); }, 1000);
+        }
+    }
+
+    // ================================
+    // Створюємо компонент Lampa
     // ================================
     waitForLampa(function(){
+
         Lampa.Noty.show('Мультиплагін активний!');
 
-        Lampa.Component.add('my_interactive_multi_plugin', {
+        Lampa.Component.add('interactive_multi_plugin', {
             name: 'Інтерактивний мультиплагін',
             component: {
                 template: `
                     <div style="padding:20px;">
-                        <h2>Балансери:</h2>
+                        <h2>Балансери (увімкнути/вимкнути):</h2>
                         <ul>
                             <li v-for="src in sources">
                                 <input type="checkbox" v-model="src.enabled"> {{ src.name }}
@@ -82,7 +99,7 @@
                     },
                     open: function(item){
                         Lampa.Noty.show('Відкриваємо джерело: ' + item.source);
-                        // Можна додати Lampa.Player.open(item.url)
+                        // Можна додати Lampa.Player.open(item.url) якщо плеєр підтримує URL
                     },
                     reloadActiveScripts: function(){
                         loadActiveSources();
@@ -91,17 +108,7 @@
                 }
             }
         });
-    });
 
-    // ================================
-    // Функція очікування Lampa
-    // ================================
-    function waitForLampa(callback){
-        if(typeof window.Lampa !== 'undefined' && window.Lampa.Component){
-            callback();
-        } else {
-            setTimeout(function(){ waitForLampa(callback); }, 1000);
-        }
-    }
+    });
 
 })();
