@@ -10,46 +10,23 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
-    var backHandlerActive = false;
-
     // ==============================
     // CSS
     // ==============================
-    $('body').append(`
-    <style>
-    .multi-container { padding:20px; }
-    .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
-    .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
-    .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; transition:0.3s; min-width:120px; text-align:center; cursor:pointer; }
-    .multi-toggle.enabled { background:#46b85a; }
-    .multi-toggle.disabled { background:#d24a4a; }
-    .multi-apply { text-align:center; margin-top:20px; padding:15px; background:#156DD1; border-radius:10px; font-weight:bold; transition:0.3s; cursor:pointer; }
-    .multi-apply.focus { background:#1f82ff; transform:scale(1.03); }
-    </style>
-    `);
-
-    // ==============================
-    // BACK кнопка (пульт)
-    // ==============================
-    function enableBackHandler() {
-
-        if (backHandlerActive) return;
-        backHandlerActive = true;
-
-        if (Lampa.Controller && Lampa.Controller.add) {
-            Lampa.Controller.add('back', function () {
-
-                if (Lampa.Modal && Lampa.Modal.isOpen && Lampa.Modal.isOpen()) {
-                    Lampa.Modal.close();
-                    return;
-                }
-
-                if (Lampa.Settings && Lampa.Settings.close) {
-                    Lampa.Settings.close();
-                    return;
-                }
-            });
-        }
+    if (!document.getElementById('multi-plugin-style')) {
+        var style = document.createElement('style');
+        style.id = 'multi-plugin-style';
+        style.innerHTML = `
+        .multi-container { padding:20px; }
+        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
+        .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
+        .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; min-width:120px; text-align:center; cursor:pointer; transition:0.3s; }
+        .multi-toggle.enabled { background:#46b85a; }
+        .multi-toggle.disabled { background:#d24a4a; }
+        .multi-apply { text-align:center; margin-top:20px; padding:15px; background:#156DD1; border-radius:10px; font-weight:bold; transition:0.3s; cursor:pointer; }
+        .multi-apply.focus { background:#1f82ff; transform:scale(1.03); }
+        `;
+        document.head.appendChild(style);
     }
 
     // ==============================
@@ -57,6 +34,7 @@
     // ==============================
     function loadActiveSources() {
         sources.forEach(function (src) {
+
             var enabled = Lampa.Storage.get('multi_' + src.name, false);
             if (!enabled) return;
 
@@ -72,11 +50,9 @@
     }
 
     // ==============================
-    // Модал керування
+    // Модальне меню балансерів
     // ==============================
     function openSourcesModal() {
-
-        enableBackHandler();
 
         var changes = false;
         var container = $('<div class="multi-container"></div>');
@@ -114,25 +90,23 @@
         });
 
         // ==============================
-        // Перезавантаження
+        // Кнопка застосування
         // ==============================
         applyButton.on('hover:enter', function () {
 
-            if (Lampa.Modal && Lampa.Modal.confirm) {
-                Lampa.Modal.confirm({
-                    title: 'Перезапуск потрібен',
-                    text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
-                    yes: function () {
-                        if (Lampa.Manifest && Lampa.Manifest.app_reload) {
-                            Lampa.Manifest.app_reload();
-                        } else {
-                            location.reload();
-                        }
+            if (!changes) return;
+
+            Lampa.Modal.confirm({
+                title: 'Перезапуск потрібен',
+                text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
+                yes: function () {
+                    if (Lampa.Manifest && Lampa.Manifest.app_reload) {
+                        Lampa.Manifest.app_reload();
+                    } else {
+                        location.reload();
                     }
-                });
-            } else {
-                location.reload();
-            }
+                }
+            });
         });
 
         container.append(applyButton);
@@ -144,14 +118,45 @@
 
         Lampa.Controller.collectionSet(container);
         Lampa.Controller.collectionFocus(container.find('.selector').first());
+
+        // ==============================
+        // BACK з пульта
+        // ==============================
+        var backHandler = function () {
+            Lampa.Modal.close();
+        };
+
+        if (Lampa.Controller && Lampa.Controller.add) {
+            Lampa.Controller.add('back', backHandler);
+        }
+
+        // ==============================
+        // Клік поза контейнером
+        // ==============================
+        setTimeout(function () {
+
+            function outsideClickHandler(e) {
+
+                var $target = $(e.target);
+
+                var isInside = $target.closest('.multi-container').length > 0;
+                var isModal = $target.closest('.lampa-modal, .modal').length > 0;
+
+                if (!isInside && !isModal) {
+                    Lampa.Modal.close();
+                    $(document).off('click.multiOutside');
+                }
+            }
+
+            $(document).on('click.multiOutside', outsideClickHandler);
+
+        }, 200);
     }
 
     // ==============================
-    // Додаємо в Налаштування
+    // Додаємо в налаштування
     // ==============================
     function initSettings() {
-
-        enableBackHandler();
 
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
         if (!SettingsApi || !SettingsApi.addComponent) return;
@@ -178,7 +183,6 @@
     function start() {
         loadActiveSources();
         initSettings();
-        enableBackHandler();
         console.log('[MultiPlugin] Started');
     }
 
