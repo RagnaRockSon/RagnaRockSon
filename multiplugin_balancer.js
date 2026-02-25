@@ -10,6 +10,8 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
+    var backControllerHandler = null; // Зберігаємо обробник для чищення
+
     // ==============================
     // CSS
     // ==============================
@@ -37,6 +39,7 @@
             var enabled = Lampa.Storage.get('multi_' + src.name, false);
             if (!enabled) return;
 
+            // Перевірка, чи скрипт вже завантажений
             if (document.querySelector('script[src="' + src.url + '"]')) return;
 
             var script = document.createElement('script');
@@ -57,16 +60,35 @@
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
         var changes = false;
+        var isModalOpen = true; // Флаг для відстеження стану модалі
 
-        // Закриття при кліку поза контейнером
+        // ==============================
+        // Закриття при кліку поза контейнером (ВИПРАВЛЕНО)
+        // ==============================
+        var outsideClickHandler = function(e) {
+            if (isModalOpen && !$(e.target).closest('.multi-container').length && !$(e.target).closest('.lampaa-modal').length) {
+                closeModal();
+            }
+        };
+
         setTimeout(function () {
-            $(document).on('click.multiPluginOutside', function(e) {
-                if (!$(e.target).closest('.multi-container').length) {
-                    Lampa.Modal.close();
-                    $(document).off('click.multiPluginOutside');
-                }
-            });
+            if (isModalOpen) {
+                $(document).on('click.multiPluginOutside', outsideClickHandler);
+            }
         }, 100);
+
+        // Функція закриття модалі
+        function closeModal() {
+            isModalOpen = false;
+            Lampa.Modal.close();
+            $(document).off('click.multiPluginOutside', outsideClickHandler);
+            
+            // Видалення обробника Back контролера
+            if (backControllerHandler) {
+                Lampa.Controller.remove(backControllerHandler);
+                backControllerHandler = null;
+            }
+        }
 
         sources.forEach(function (src) {
             var storageKey = 'multi_' + src.name;
@@ -103,10 +125,14 @@
                 title: 'Перезапуск потрібен',
                 text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
                 yes: function () {
-                    if (Lampa.Manifest.app_reload) {
+                    closeModal();
+                    
+                    if (Lampa.Manifest && Lampa.Manifest.app_reload) {
                         Lampa.Manifest.app_reload();
-                    } else {
+                    } else if (typeof location !== 'undefined') {
                         location.reload();
+                    } else {
+                        console.error('[MultiPlugin] Cannot reload application');
                     }
                 }
             });
@@ -116,8 +142,7 @@
         // Кнопка Назад у модальному меню
         // ==============================
         backButton.on('hover:enter', function () {
-            Lampa.Modal.close();
-            $(document).off('click.multiPluginOutside');
+            closeModal();
         });
 
         container.append(applyButton).append(backButton);
@@ -127,16 +152,28 @@
             html: container
         });
 
-        Lampa.Controller.collectionSet(container);
-        Lampa.Controller.collectionFocus(container.find('.selector').first());
-
-        // Кнопка Back на пульті для модального меню
-        Lampa.Controller.add('back', function () {
-            if (Lampa.Modal.isOpen()) {
-                Lampa.Modal.close();
-                $(document).off('click.multiPluginOutside');
+        // ==============================
+        // Керування фокусом та навігацією (ВИПРАВЛЕНО)
+        // ==============================
+        if (Lampa.Controller && Lampa.Controller.collectionSet) {
+            Lampa.Controller.collectionSet(container);
+            var firstSelector = container.find('.selector').first();
+            if (firstSelector.length) {
+                Lampa.Controller.collectionFocus(firstSelector);
             }
-        });
+        }
+
+        // ==============================
+        // Back для модального меню (ВИПРАВЛЕНО)
+        // ==============================
+        if (Lampa.Controller && Lampa.Controller.add) {
+            backControllerHandler = function () {
+                if (Lampa.Modal.isOpen && Lampa.Modal.isOpen()) {
+                    closeModal();
+                }
+            };
+            Lampa.Controller.add('back', backControllerHandler);
+        }
     }
 
     // ==============================
@@ -144,7 +181,10 @@
     // ==============================
     function initSettings() {
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
-        if (!SettingsApi || !SettingsApi.addComponent) return;
+        if (!SettingsApi || !SettingsApi.addComponent) {
+            console.warn('[MultiPlugin] SettingsApi not available');
+            return;
+        }
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
@@ -162,18 +202,20 @@
         });
 
         // Back для меню плагіна
-        SettingsApi.addParam({
-            component: 'multi_balancers',
-            param: { name: 'multi_back', type: 'button' },
-            field: { name: 'Назад' },
-            onChange: function () {
-                if (SettingsApi.close) {
-                    SettingsApi.close();
-                } else {
-                    console.log('[MultiPlugin] Close menu');
+        if (SettingsApi.addParam) {
+            SettingsApi.addParam({
+                component: 'multi_balancers',
+                param: { name: 'multi_back', type: 'button' },
+                field: { name: 'Назад' },
+                onChange: function () {
+                    if (SettingsApi.close) {
+                        SettingsApi.close();
+                    } else {
+                        console.log('[MultiPlugin] Close menu');
+                    }
                 }
-            }
-        });
+            });
+        }
     }
 
     // ==============================
@@ -185,10 +227,17 @@
         console.log('[MultiPlugin] Started');
     }
 
+    // ==============================
+    // Ініціалізація (ВИПРАВЛЕНО)
+    // ==============================
     if (Lampa.Listener) {
         Lampa.Listener.follow('app', function (e) {
-            if (e.type === 'ready') start();
+            if (e.type === 'ready') {
+                start();
+            }
         });
+    } else if (document.readyState === 'loading') {
+        document.addEventListener('DOMContentLoaded', start);
     } else {
         start();
     }
