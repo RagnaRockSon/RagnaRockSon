@@ -15,7 +15,7 @@
     // ==============================
     $('body').append(`
     <style>
-    .multi-container { padding:20px; }
+    .multi-container { padding:20px; position: relative; }
     .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
     .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
     .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; min-width:120px; text-align:center; cursor:pointer; transition: all 0.4s ease; color:#fff; }
@@ -57,6 +57,16 @@
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
+        // Закриття при кліку поза контейнером
+        setTimeout(function () {
+            $(document).on('click.multiPluginOutside', function(e) {
+                if (!$(e.target).closest('.multi-container').length) {
+                    Lampa.Modal.close();
+                    $(document).off('click.multiPluginOutside');
+                }
+            });
+        }, 100); // затримка, щоб контейнер встиг додатися
+
         sources.forEach(function (src) {
             var storageKey = 'multi_' + src.name;
             var enabled = Lampa.Storage.get(storageKey, false);
@@ -74,7 +84,6 @@
                 enabled = !enabled;
                 Lampa.Storage.set(storageKey, enabled);
 
-                // плавна анімація зміни кольору
                 item.find('.multi-toggle')
                     .removeClass('enabled disabled')
                     .addClass(enabled ? 'enabled' : 'disabled')
@@ -113,6 +122,7 @@
         // ==============================
         backButton.on('hover:enter', function () {
             Lampa.Modal.close();
+            $(document).off('click.multiPluginOutside');
         });
 
         container.append(applyButton).append(backButton);
