@@ -10,15 +10,11 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
-    var modalState = {
-        isOpen: false,
-        outsideClickHandler: null,
-        container: null,
-        backKeyHandler: null
-    };
+    var navigationStack = []; // Стек для відстеження рівнів навігації
+    var currentLevel = null; // Поточний рівень
 
     // ==============================
-    // CSS (додаємо один раз)
+    // CSS
     // ==============================
     function injectCSS() {
         if (document.getElementById('multi-plugin-styles')) return;
@@ -64,68 +60,81 @@
     }
 
     // ==============================
-    // Закриття модалі
+    // Вихід назад на попередній рівень
     // ==============================
-    function closeModal() {
-        if (!modalState.isOpen) return;
-
-        modalState.isOpen = false;
-
-        // Закриваємо Lampa Modal
-        if (Lampa.Modal && typeof Lampa.Modal.close === 'function') {
-            Lampa.Modal.close();
+    function goBack() {
+        if (navigationStack.length === 0) {
+            console.log('[MultiPlugin] No previous level');
+            return;
         }
 
-        // Видаляємо обробник click
-        if (modalState.outsideClickHandler) {
-            $(document).off('click.multiPluginOutside');
-            modalState.outsideClickHandler = null;
-        }
+        var previousLevel = navigationStack.pop();
+        console.log('[MultiPlugin] Going back to level:', previousLevel.name);
 
-        // Очищуємо контейнер
-        if (modalState.container) {
-            modalState.container = null;
+        if (previousLevel.type === 'modal') {
+            closeAllAndOpenBalancersModal();
+        } else if (previousLevel.type === 'settings') {
+            // Закриваємо модаль і повертаємось до меню налаштувань
+            if (Lampa.Modal && typeof Lampa.Modal.close === 'function') {
+                Lampa.Modal.close();
+            }
         }
-
-        console.log('[MultiPlugin] Modal closed');
     }
 
     // ==============================
-    // Модал керування
+    // Закриття всіх модалей
+    // ==============================
+    function closeAll() {
+        if (Lampa.Modal && typeof Lampa.Modal.close === 'function') {
+            Lampa.Modal.close();
+        }
+        $(document).off('click.multiPluginOutside');
+        navigationStack = [];
+        currentLevel = null;
+    }
+
+    // ==============================
+    // Відкриття модалі балансерів
+    // ==============================
+    function closeAllAndOpenBalancersModal() {
+        if (Lampa.Modal && typeof Lampa.Modal.close === 'function') {
+            Lampa.Modal.close();
+        }
+        $(document).off('click.multiPluginOutside');
+        
+        setTimeout(function() {
+            openSourcesModal();
+        }, 100);
+    }
+
+    // ==============================
+    // Модал керування балансерами
     // ==============================
     function openSourcesModal() {
-        // Закриваємо попередню модаль, якщо вона відкрита
-        if (modalState.isOpen) {
-            return;
-        }
+        currentLevel = { type: 'modal', name: 'balancers' };
+        navigationStack.push(currentLevel);
 
         var container = $('<div class="multi-container"></div>');
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
         var hasChanges = false;
-        modalState.isOpen = true;
-        modalState.container = container;
 
         // ==============================
         // Обробник для кліку поза модаллю
         // ==============================
-        modalState.outsideClickHandler = function(e) {
-            if (modalState.isOpen) {
-                var $target = $(e.target);
-                var isInContainer = $target.closest('.multi-container').length > 0;
-                var isInModal = $target.closest('.lampa-modal, .modal, [class*="modal"]').length > 0;
+        var outsideClickHandler = function(e) {
+            var $target = $(e.target);
+            var isInContainer = $target.closest('.multi-container').length > 0;
+            var isInModal = $target.closest('.lampa-modal, .modal, [class*="modal"]').length > 0;
 
-                if (!isInContainer && !isInModal) {
-                    closeModal();
-                }
+            if (!isInContainer && !isInModal) {
+                goBack();
             }
         };
 
         setTimeout(function () {
-            if (modalState.isOpen) {
-                $(document).on('click.multiPluginOutside', modalState.outsideClickHandler);
-            }
+            $(document).on('click.multiPluginOutside', outsideClickHandler);
         }, 150);
 
         // ==============================
@@ -167,7 +176,7 @@
                     title: 'Перезапуск потрібен',
                     text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
                     yes: function () {
-                        closeModal();
+                        closeAll();
                         
                         if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
                             Lampa.Manifest.app_reload();
@@ -183,7 +192,7 @@
         // Кнопка Назад
         // ==============================
         backButton.on('hover:enter', function () {
-            closeModal();
+            goBack();
         });
 
         container.append(applyButton).append(backButton);
@@ -210,29 +219,12 @@
         }
 
         // ==============================
-        // Back контролер (ВИПРАВЛЕНО)
+        // Back контролер
         // ==============================
-        if (Lampa.Controller) {
-            // Видаляємо старий обробник, якщо він існує
-            if (modalState.backKeyHandler) {
-                try {
-                    Lampa.Controller.remove && Lampa.Controller.remove(modalState.backKeyHandler);
-                } catch (e) {
-                    console.log('[MultiPlugin] Could not remove previous back handler');
-                }
-            }
-
-            // Створюємо новий обробник
-            modalState.backKeyHandler = function () {
-                if (modalState.isOpen) {
-                    closeModal();
-                }
-            };
-
-            // Додаємо обробник
-            if (typeof Lampa.Controller.add === 'function') {
-                Lampa.Controller.add('back', modalState.backKeyHandler);
-            }
+        if (Lampa.Controller && typeof Lampa.Controller.add === 'function') {
+            Lampa.Controller.add('back', function () {
+                goBack();
+            });
         }
     }
 
@@ -253,20 +245,29 @@
                 icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
             });
 
+            // ==============================
+            // Кнопка "Керування балансерами"
+            // ==============================
             SettingsApi.addParam({
                 component: 'multi_balancers',
                 param: { name: 'multi_manage', type: 'button' },
                 field: { name: 'Керування балансерами' },
                 onChange: function () {
+                    currentLevel = { type: 'settings', name: 'main' };
+                    navigationStack = [currentLevel]; // Очищуємо стек і додаємо поточний рівень
                     openSourcesModal();
                 }
             });
 
+            // ==============================
+            // Кнопка "Назад" у меню плагіна
+            // ==============================
             SettingsApi.addParam({
                 component: 'multi_balancers',
                 param: { name: 'multi_back', type: 'button' },
                 field: { name: 'Назад' },
                 onChange: function () {
+                    closeAll();
                     if (SettingsApi.close && typeof SettingsApi.close === 'function') {
                         SettingsApi.close();
                     }
