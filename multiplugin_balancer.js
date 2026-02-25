@@ -30,30 +30,26 @@
     `);
 
     // ==============================
-    // Завантаження активних джерел
+    // Завантаження активних
     // ==============================
     function loadActiveSources() {
         sources.forEach(function (src) {
-            var enabled = false;
-            try { enabled = Lampa.Storage.get('multi_' + src.name, false); } 
-            catch(e) { console.warn('[MultiPlugin] Storage error for', src.name, e); }
+            var enabled = Lampa.Storage.get('multi_' + src.name, false);
             if (!enabled) return;
 
             if (document.querySelector('script[src="' + src.url + '"]')) return;
 
-            try {
-                var script = document.createElement('script');
-                script.src = src.url;
-                script.async = false;
-                script.onerror = function() { console.error('[MultiPlugin] Failed to load:', src.name); };
-                document.body.appendChild(script);
-                console.log('[MultiPlugin] Loaded:', src.name);
-            } catch(e) { console.error('[MultiPlugin] Error appending script:', src.name, e); }
+            var script = document.createElement('script');
+            script.src = src.url;
+            script.async = false;
+            document.body.appendChild(script);
+
+            console.log('[MultiPlugin] Loaded:', src.name);
         });
     }
 
     // ==============================
-    // Модальне меню
+    // Модал керування
     // ==============================
     function openSourcesModal() {
         var changes = false;
@@ -62,33 +58,33 @@
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
         // ==============================
-        // Функція безпечного закриття модалі
+        // Закриття модалі
         // ==============================
-        function safeCloseModal() {
-            try { Lampa.Modal.close(); } 
-            catch(e) { console.error('[MultiPlugin] Error closing modal', e); }
+        function closeModal() {
+            Lampa.Modal.close();
             $(document).off('click.multiPluginOutside');
+            if (Lampa.Controller && Lampa.Controller.remove) {
+                Lampa.Controller.remove('back');
+            }
         }
 
         // ==============================
-        // Закриття при кліку/тапі поза контейнером
+        // Клік поза контейнером
         // ==============================
         setTimeout(function () {
-            $(document).on('click.multiPluginOutside touchstart.multiPluginOutside', function(e) {
+            $(document).on('click.multiPluginOutside', function(e) {
                 if (!$(e.target).closest('.multi-container').length) {
-                    safeCloseModal();
+                    closeModal();
                 }
             });
         }, 100);
 
         // ==============================
-        // Додавання елементів джерел
+        // Додаємо джерела
         // ==============================
         sources.forEach(function (src) {
             var storageKey = 'multi_' + src.name;
-            var enabled = false;
-            try { enabled = Lampa.Storage.get(storageKey, false); } 
-            catch(e) { console.warn('[MultiPlugin] Storage error for', src.name, e); }
+            var enabled = Lampa.Storage.get(storageKey, false);
 
             var item = $(`
                 <div class="multi-item selector">
@@ -100,18 +96,16 @@
             `);
 
             item.on('hover:enter', function () {
-                try {
-                    enabled = !enabled;
-                    Lampa.Storage.set(storageKey, enabled);
+                enabled = !enabled;
+                Lampa.Storage.set(storageKey, enabled);
 
-                    item.find('.multi-toggle')
-                        .removeClass('enabled disabled')
-                        .addClass(enabled ? 'enabled' : 'disabled')
-                        .text(enabled ? 'Увімкнено' : 'Вимкнено');
+                item.find('.multi-toggle')
+                    .removeClass('enabled disabled')
+                    .addClass(enabled ? 'enabled' : 'disabled')
+                    .text(enabled ? 'Увімкнено' : 'Вимкнено');
 
-                    changes = true;
-                    applyButton.show();
-                } catch(e) { console.error('[MultiPlugin] Error toggling', src.name, e); }
+                changes = true;
+                applyButton.show();
             });
 
             container.append(item);
@@ -120,42 +114,53 @@
         // ==============================
         // Кнопка застосувати зміни
         // ==============================
-        applyButton.on('hover:enter', function () {
-            if (!changes) return;
-            try {
-                if (Lampa.Modal && Lampa.Modal.confirm) {
-                    Lampa.Modal.confirm({
-                        title: 'Перезапуск потрібен',
-                        text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
-                        yes: function () {
-                            safeCloseModal();
-                            if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
-                                Lampa.Manifest.app_reload();
-                            } else { location.reload(); }
-                        }
-                    });
-                } else { location.reload(); }
-            } catch(e) { console.error('[MultiPlugin] Error applying changes', e); location.reload(); }
-        });
+        applyButton.on('hover:enter', function () {  
+            if (Lampa.Modal && Lampa.Modal.confirm) {  
+                Lampa.Modal.confirm({  
+                    title: 'Перезапуск потрібен',  
+                    text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',  
+                    yes: function () {  
+                        closeModal();
+                        if (Lampa.Manifest.app_reload) {  
+                            Lampa.Manifest.app_reload();  
+                        } else {  
+                            location.reload();  
+                        }  
+                    }  
+                });  
+            } else {  
+                location.reload();  
+            }  
+        });  
 
         // ==============================
         // Кнопка Назад
         // ==============================
-        backButton.on('hover:enter', safeCloseModal);
+        backButton.on('hover:enter', function () {
+            closeModal();
+        });
 
         container.append(applyButton).append(backButton);
 
-        try { Lampa.Modal.open({ title: 'Мультиплагін — Балансери', html: container }); } 
-        catch(e) { console.error('[MultiPlugin] Error opening modal', e); }
+        // ==============================
+        // Відкриваємо модаль
+        // ==============================
+        Lampa.Modal.open({
+            title: 'Мультиплагін — Балансери',
+            html: container
+        });
 
-        // Навігація
-        try {
-            Lampa.Controller.collectionSet(container);
-            Lampa.Controller.collectionFocus(container.find('.selector').first());
-            if (Lampa.Controller && Lampa.Controller.add) {
-                Lampa.Controller.add('back', safeCloseModal); // BACK на пульті
-            }
-        } catch(e) { console.warn('[MultiPlugin] Controller error', e); }
+        Lampa.Controller.collectionSet(container);
+        Lampa.Controller.collectionFocus(container.find('.selector').first());
+
+        // ==============================
+        // BACK на пульті
+        // ==============================
+        if (Lampa.Controller && Lampa.Controller.add) {
+            Lampa.Controller.add('back', function() {
+                closeModal();
+            });
+        }
     }
 
     // ==============================
@@ -175,7 +180,9 @@
             component: 'multi_balancers',
             param: { name: 'multi_manage', type: 'button' },
             field: { name: 'Керування балансерами' },
-            onChange: function () { openSourcesModal(); }
+            onChange: function () {
+                openSourcesModal();
+            }
         });
     }
 
@@ -185,11 +192,15 @@
     function start() {
         loadActiveSources();
         initSettings();
-        console.log('[MultiPlugin] Started safely');
+        console.log('[MultiPlugin] Started');
     }
 
     if (Lampa.Listener) {
-        Lampa.Listener.follow('app', function (e) { if (e.type === 'ready') start(); });
-    } else { start(); }
+        Lampa.Listener.follow('app', function (e) {
+            if (e.type === 'ready') start();
+        });
+    } else {
+        start();
+    }
 
 })();
