@@ -10,6 +10,8 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
+    var backHandlerActive = false;
+
     // ==============================
     // CSS
     // ==============================
@@ -25,6 +27,30 @@
     .multi-apply.focus { background:#1f82ff; transform:scale(1.03); }
     </style>
     `);
+
+    // ==============================
+    // BACK кнопка (пульт)
+    // ==============================
+    function enableBackHandler() {
+
+        if (backHandlerActive) return;
+        backHandlerActive = true;
+
+        if (Lampa.Controller && Lampa.Controller.add) {
+            Lampa.Controller.add('back', function () {
+
+                if (Lampa.Modal && Lampa.Modal.isOpen && Lampa.Modal.isOpen()) {
+                    Lampa.Modal.close();
+                    return;
+                }
+
+                if (Lampa.Settings && Lampa.Settings.close) {
+                    Lampa.Settings.close();
+                    return;
+                }
+            });
+        }
+    }
 
     // ==============================
     // Завантаження активних
@@ -49,6 +75,8 @@
     // Модал керування
     // ==============================
     function openSourcesModal() {
+
+        enableBackHandler();
 
         var changes = false;
         var container = $('<div class="multi-container"></div>');
@@ -86,18 +114,16 @@
         });
 
         // ==============================
-        // Перезавантаження через внутрішній API Lampa
+        // Перезавантаження
         // ==============================
         applyButton.on('hover:enter', function () {
 
-            // Виклик системного вікна перезавантаження
             if (Lampa.Modal && Lampa.Modal.confirm) {
                 Lampa.Modal.confirm({
                     title: 'Перезапуск потрібен',
                     text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
                     yes: function () {
-                        // Тут ми симулюємо системне перезавантаження
-                        if (Lampa.Manifest.app_reload) {
+                        if (Lampa.Manifest && Lampa.Manifest.app_reload) {
                             Lampa.Manifest.app_reload();
                         } else {
                             location.reload();
@@ -105,10 +131,8 @@
                     }
                 });
             } else {
-                // fallback на звичайний reload
                 location.reload();
             }
-
         });
 
         container.append(applyButton);
@@ -126,6 +150,8 @@
     // Додаємо в Налаштування
     // ==============================
     function initSettings() {
+
+        enableBackHandler();
 
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
         if (!SettingsApi || !SettingsApi.addComponent) return;
@@ -152,6 +178,7 @@
     function start() {
         loadActiveSources();
         initSettings();
+        enableBackHandler();
         console.log('[MultiPlugin] Started');
     }
 
