@@ -93,26 +93,28 @@
         Lampa.Controller.collectionFocus(container.find('.selector').first());
 
         applyButton.on('hover:enter', function () {
-            Lampa.Modal.open({
-                title: 'Перезапуск потрібен',
-                text: 'Застосувати зміни зараз?',
-                buttons: [
-                    {
-                        name: 'Так',
-                        onSelect: function () {
-                            location.reload();
-                        }
-                    },
-                    {
-                        name: 'Ні',
-                        onSelect: function () {
-                            Lampa.Modal.close();
-                        }
+    // Відкладемо виклик на 50 мс, щоб Lampa встигла обробити фокус
+    setTimeout(function() {
+        Lampa.Modal.open({
+            title: 'Перезапуск потрібен',
+            text: 'Застосувати зміни зараз?',
+            buttons: [
+                {
+                    name: 'Так',
+                    onSelect: function () {
+                        location.reload();
                     }
-                ]
-            });
+                },
+                {
+                    name: 'Ні',
+                    onSelect: function () {
+                        Lampa.Modal.close();
+                    }
+                }
+            ]
         });
-    }
+    }, 50);
+});
 
     // ==============================
     // Додаємо в Налаштування
