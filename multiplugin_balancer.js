@@ -58,11 +58,16 @@
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
         // ==============================
-        // Закриття модалі
+        // Функція закриття модалі
         // ==============================
         function closeModal() {
-            Lampa.Modal.close();
+            // Закриваємо модаль балансерів
+            if (Lampa.Modal && Lampa.Modal.close) {
+                Lampa.Modal.close();
+            }
             $(document).off('click.multiPluginOutside');
+
+            // Видаляємо BACK контролер
             if (Lampa.Controller && Lampa.Controller.remove) {
                 Lampa.Controller.remove('back');
             }
