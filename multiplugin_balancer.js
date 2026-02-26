@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.0';
+    const VERSION = 'v4.1';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -29,6 +29,8 @@
             .multi-toggle.enabled { background:#46b85a; }
             .multi-toggle.disabled { background:#d24a4a; }
             .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
+            .multi-apply:hover { transform:scale(1.03); background:#1f82ff; }
+            .multi-edit-btn { margin-left:10px; cursor:pointer; font-weight:bold; color:#FFD948; }
         `;
         document.head.appendChild(style);
     }
@@ -63,6 +65,43 @@
         Lampa.Modal.close();
     }
 
+    // --- Модал редагування джерела ---
+    function openEditSourceModal(srcIndex) {
+        var src = sources[srcIndex] || { name: '', url: '' };
+        var wrapper = $(`
+            <div style="padding:15px;">
+                <label>Назва джерела:</label>
+                <input type="text" class="edit-name" value="${src.name}" style="width:100%; margin-bottom:10px;">
+                <label>URL джерела:</label>
+                <input type="text" class="edit-url" value="${src.url}" style="width:100%; margin-bottom:15px;">
+                <div class="multi-apply selector">Зберегти</div>
+            </div>
+        `);
+
+        wrapper.find('.multi-apply').on('hover:enter', function () {
+            var newName = wrapper.find('.edit-name').val().trim();
+            var newUrl = wrapper.find('.edit-url').val().trim();
+            if (!newName || !newUrl) return Lampa.Noty.show('Заповніть обидва поля');
+
+            if (srcIndex >= 0) {
+                sources[srcIndex].name = newName;
+                sources[srcIndex].url = newUrl;
+            } else {
+                sources.push({ name: newName, url: newUrl });
+            }
+
+            hasChanges = true;
+            closeModal({ onClose: openSourcesModal });
+        });
+
+        Lampa.Modal.open({
+            title: srcIndex >= 0 ? 'Редагувати джерело' : 'Додати джерело',
+            html: wrapper,
+            size: 'medium',
+            onBack: function () { closeModal({ onClose: openSourcesModal }); return true; }
+        });
+    }
+
     function openSourcesModal() {
         tempState = {};
         hasChanges = false;
@@ -70,7 +109,7 @@
         var container = $('<div class="multi-container"></div>');
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
 
-        sources.forEach(function (src) {
+        sources.forEach(function (src, index) {
             var key = 'multi_' + src.name;
             var current = Lampa.Storage.get(key, false);
             tempState[key] = current;
@@ -78,35 +117,43 @@
             var item = $(`
                 <div class="multi-item selector">
                     <div>${src.name}</div>
-                    <div class="multi-toggle ${current ? 'enabled' : 'disabled'}">
-                        ${current ? 'Увімкнено' : 'Вимкнено'}
+                    <div>
+                        <span class="multi-toggle ${current ? 'enabled' : 'disabled'}">
+                            ${current ? 'Увімкнено' : 'Вимкнено'}
+                        </span>
+                        <span class="multi-edit-btn">✎</span>
                     </div>
                 </div>
             `);
 
-            item.on('hover:enter', function () {
+            item.find('.multi-toggle').on('hover:enter', function () {
                 tempState[key] = !tempState[key];
-                item.find('.multi-toggle')
-                    .removeClass('enabled disabled')
-                    .addClass(tempState[key] ? 'enabled' : 'disabled')
+                $(this).removeClass('enabled disabled').addClass(tempState[key] ? 'enabled' : 'disabled')
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
                 updateTitle($('.modal__title'));
             });
 
+            item.find('.multi-edit-btn').on('hover:enter', function () {
+                closeModal({ onClose: function () { openEditSourceModal(index); } });
+            });
+
             container.append(item);
         });
 
+        var addBtn = $('<div class="multi-item selector"><div>Додати нове джерело</div></div>');
+        addBtn.on('hover:enter', function () {
+            closeModal({ onClose: function () { openEditSourceModal(-1); } });
+        });
+        container.append(addBtn);
+
         applyBtn.on('hover:enter', function () {
             if (!hasChanges) return;
-
             Object.keys(tempState).forEach(function (k) {
                 Lampa.Storage.set(k, tempState[k]);
             });
-
             disableOutsideClose();
-
             if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
                 Lampa.Manifest.app_reload();
             } else {
@@ -120,10 +167,7 @@
             title: `Мій мультиплагін ${VERSION} — Балансери`,
             html: container,
             size: 'medium',
-            onBack: function () {
-                closeModal({ onClose: function () { Lampa.Controller.toggle('settings_component'); } });
-                return true;
-            }
+            onBack: function () { closeModal({ onClose: function () { Lampa.Controller.toggle('settings_component'); } }); return true; }
         });
 
         setTimeout(function () {
@@ -169,11 +213,7 @@
         injectCSS();
         loadActiveSources();
         initSettings();
-
-        if (Lampa.Noty) {
-            Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
-        }
-
+        if (Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
         console.log(`[MultiPlugin ${VERSION}] Loaded`);
     }
 
