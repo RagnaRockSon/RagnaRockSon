@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v1.9';
+    const VERSION = 'v2.0';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -13,9 +13,12 @@
     ];
 
     var tempState = {};
+    var hasChanges = false;
+    var outsideHandler = null;
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
+
         var style = document.createElement('style');
         style.id = 'multi-style';
         style.innerHTML = `
@@ -29,28 +32,47 @@
         document.head.appendChild(style);
     }
 
-    function loadActiveSources() {
-        sources.forEach(function (src) {
-            var enabled = Lampa.Storage.get('multi_' + src.name, false);
-            if (!enabled) return;
-            if (document.querySelector('script[src="' + src.url + '"]')) return;
+    function updateTitle() {
+        var title = hasChanges
+            ? 'Мій мультиплагін ' + VERSION + ' — Балансери ●'
+            : 'Мій мультиплагін ' + VERSION + ' — Балансери';
 
-            var script = document.createElement('script');
-            script.src = src.url;
-            script.async = false;
-            document.body.appendChild(script);
-        });
+        $('.modal__title').text(title);
+    }
+
+    function enableOutsideClose(container) {
+
+        setTimeout(function () {
+
+            outsideHandler = function (e) {
+                if (!$(e.target).closest('.multi-container').length) {
+                    closeModal();
+                }
+            };
+
+            $('.modal').on('mousedown.multi', outsideHandler);
+
+        }, 200);
+    }
+
+    function disableOutsideClose() {
+        $('.modal').off('mousedown.multi');
+        outsideHandler = null;
+    }
+
+    function closeModal() {
+        disableOutsideClose();
+        Lampa.Modal.close();
     }
 
     function openSourcesModal() {
 
         tempState = {};
-        var hasChanges = false;
+        hasChanges = false;
 
         var container = $('<div class="multi-container"></div>');
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
 
-        // Створюємо список перемикачів
         sources.forEach(function (src) {
 
             var key = 'multi_' + src.name;
@@ -77,12 +99,12 @@
 
                 hasChanges = true;
                 applyBtn.show();
+                updateTitle();
             });
 
             container.append(item);
         });
 
-        // Натискання Apply
         applyBtn.on('hover:enter', function () {
 
             if (!hasChanges) return;
@@ -91,7 +113,8 @@
                 Lampa.Storage.set(k, tempState[k]);
             });
 
-            // Перезавантаження Lampa
+            disableOutsideClose();
+
             if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
                 Lampa.Manifest.app_reload();
             } else {
@@ -105,16 +128,30 @@
             title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
             html: container,
             onBack: function () {
-                return true; // Lampa закриє модальний
-            },
-            // Обов’язково обробляємо клік поза вікном
-            outside: true
+                closeModal();
+                return true;
+            }
         });
 
         setTimeout(function () {
             Lampa.Controller.collectionSet(container);
             Lampa.Controller.collectionFocus(container.find('.selector').first());
-        }, 100);
+            enableOutsideClose(container);
+            updateTitle();
+        }, 200);
+    }
+
+    function loadActiveSources() {
+        sources.forEach(function (src) {
+            var enabled = Lampa.Storage.get('multi_' + src.name, false);
+            if (!enabled) return;
+            if (document.querySelector('script[src="' + src.url + '"]')) return;
+
+            var script = document.createElement('script');
+            script.src = src.url;
+            script.async = false;
+            document.body.appendChild(script);
+        });
     }
 
     function initSettings() {
@@ -140,7 +177,11 @@
         injectCSS();
         loadActiveSources();
         initSettings();
-        if (Lampa.Noty) Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
+
+        if (Lampa.Noty) {
+            Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
+        }
+
         console.log('[MultiPlugin ' + VERSION + '] Loaded');
     }
 
