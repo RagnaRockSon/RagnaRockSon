@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v2.2';
+    const VERSION = 'v2.3';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -15,11 +15,10 @@
     var tempState = {};
     var hasChanges = false;
     var outsideHandler = null;
-    var pluginStack = []; // Стек меню плагіну для відновлення після модалки
+    var pluginStack = [];
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
-
         var style = document.createElement('style');
         style.id = 'multi-style';
         style.innerHTML = `
@@ -34,18 +33,15 @@
     }
 
     function updateTitle() {
-        var title = hasChanges
-            ? 'Мій мультиплагін ' + VERSION + ' — Балансери ●'
-            : 'Мій мультиплагін ' + VERSION + ' — Балансери';
-
+        var title = 'Мій мультиплагін ' + VERSION + ' — Балансери' + (hasChanges ? ' ●' : '');
         $('.modal__title').text(title);
     }
 
-    function enableOutsideClose(container) {
+    function enableOutsideClose(container, onClose) {
         setTimeout(function () {
             outsideHandler = function (e) {
                 if (!$(e.target).closest('.multi-container').length) {
-                    closeModal();
+                    onClose();
                 }
             };
             $('.modal').on('mousedown.multi', outsideHandler);
@@ -53,31 +49,16 @@
     }
 
     function disableOutsideClose() {
-        $('.modal').off('mousedown.multi');
-        outsideHandler = null;
-    }
-
-    function closeModal() {
-        disableOutsideClose();
-        Lampa.Modal.close();
-
-        // Відновлення меню плагіну після закриття модалки
-        if (pluginStack.length) {
-            var last = pluginStack.pop();
-            if (last && last.length) {
-                Lampa.Controller.collectionSet(last);
-                Lampa.Controller.collectionFocus(last.find('.selector').first());
-            }
+        if (outsideHandler) {
+            $('.modal').off('mousedown.multi', outsideHandler);
+            outsideHandler = null;
         }
     }
 
     function openSourcesModal() {
+
         tempState = {};
         hasChanges = false;
-
-        // Зберігаємо стан меню плагіну у стек
-        var currentPlugin = $('.settings-component[multi_balancers]');
-        if (currentPlugin.length) pluginStack.push(currentPlugin);
 
         var container = $('<div class="multi-container"></div>');
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
@@ -98,12 +79,10 @@
 
             item.on('hover:enter', function () {
                 tempState[key] = !tempState[key];
-
                 item.find('.multi-toggle')
                     .removeClass('enabled disabled')
                     .addClass(tempState[key] ? 'enabled' : 'disabled')
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
-
                 hasChanges = true;
                 applyBtn.show();
                 updateTitle();
@@ -130,6 +109,9 @@
 
         container.append(applyBtn);
 
+        // push plugin menu to stack
+        if (Lampa.Controller && Lampa.Controller.toggle) pluginStack.push('settings_component');
+
         Lampa.Modal.open({
             title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
             html: container,
@@ -139,10 +121,20 @@
             }
         });
 
+        function closeModal() {
+            disableOutsideClose();
+            Lampa.Modal.close();
+            // pop plugin menu from stack and restore
+            if (pluginStack.length) {
+                var pluginMenu = pluginStack.pop();
+                Lampa.Controller.toggle(pluginMenu);
+            }
+        }
+
         setTimeout(function () {
             Lampa.Controller.collectionSet(container);
             Lampa.Controller.collectionFocus(container.find('.selector').first());
-            enableOutsideClose(container);
+            enableOutsideClose(container, closeModal);
             updateTitle();
         }, 200);
     }
