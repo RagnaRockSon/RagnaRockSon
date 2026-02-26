@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v3.1';
+    const VERSION = 'v4.0';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -18,80 +18,34 @@
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
+
         var style = document.createElement('style');
         style.id = 'multi-style';
         style.innerHTML = `
-            /* Контейнер модалки */
-            .multi-container {
-                padding:20px;
-                opacity:0;
-                transform: translateY(-20px);
-                transition: opacity 0.3s ease, transform 0.3s ease;
-            }
-            .multi-container.show {
-                opacity:1;
-                transform: translateY(0);
-            }
-            /* Елементи списку */
-            .multi-item {
-                display:flex;
-                justify-content:space-between;
-                align-items:center;
-                padding:15px;
-                margin-bottom:10px;
-                background:rgba(255,255,255,0.05);
-                border-radius:10px;
-                transition: background 0.3s, transform 0.2s;
-            }
-            .multi-item.focus {
-                background:rgba(255,255,255,0.15);
-                transform: scale(1.03);
-            }
-            /* Тогл кнопка */
-            .multi-toggle {
-                padding:6px 14px;
-                border-radius:20px;
-                min-width:120px;
-                text-align:center;
-                color:#fff;
-                cursor:pointer;
-                transition: all 0.3s;
-            }
-            .multi-toggle.enabled { background:#46b85a; box-shadow:0 0 8px #46b85a; }
-            .multi-toggle.disabled { background:#d24a4a; box-shadow:0 0 8px #d24a4a; }
-            /* Кнопка застосувати */
-            .multi-apply {
-                text-align:center;
-                margin-top:20px;
-                padding:15px;
-                border-radius:10px;
-                font-weight:bold;
-                cursor:pointer;
-                background:#156DD1;
-                color:#fff;
-                display:none;
-                transition: all 0.3s;
-            }
-            .multi-apply:hover {
-                background:#1f82ff;
-                transform: scale(1.03);
-            }
+            .multi-container { padding:20px; transition: all 0.3s ease; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.3s ease; }
+            .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
+            .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; cursor:pointer; transition: all 0.3s ease; }
+            .multi-toggle.enabled { background:#46b85a; }
+            .multi-toggle.disabled { background:#d24a4a; }
+            .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
         `;
         document.head.appendChild(style);
     }
 
-    function updateTitle() {
+    function updateTitle(modalTitle) {
+        if (!modalTitle) return;
         var title = hasChanges
-            ? 'Мій мультиплагін ' + VERSION + ' — Балансери ●'
-            : 'Мій мультиплагін ' + VERSION + ' — Балансери';
-        $('.modal__title').text(title);
+            ? `Мій мультиплагін ${VERSION} — Балансери ●`
+            : `Мій мультиплагін ${VERSION} — Балансери`;
+        modalTitle.text(title);
     }
 
-    function enableOutsideClose(container) {
+    function enableOutsideClose(container, modal) {
         setTimeout(function () {
             outsideHandler = function (e) {
-                if (!$(e.target).closest('.multi-container').length) {
-                    closeModal();
+                if (!$(e.target).closest(container).length) {
+                    closeModal(modal);
                 }
             };
             $('.modal').on('mousedown.multi', outsideHandler);
@@ -103,8 +57,9 @@
         outsideHandler = null;
     }
 
-    function closeModal() {
+    function closeModal(modal) {
         disableOutsideClose();
+        if (modal && modal.onClose) modal.onClose();
         Lampa.Modal.close();
     }
 
@@ -135,10 +90,9 @@
                     .removeClass('enabled disabled')
                     .addClass(tempState[key] ? 'enabled' : 'disabled')
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
-
                 hasChanges = true;
                 applyBtn.show();
-                updateTitle();
+                updateTitle($('.modal__title'));
             });
 
             container.append(item);
@@ -163,28 +117,20 @@
         container.append(applyBtn);
 
         Lampa.Modal.open({
-            title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
+            title: `Мій мультиплагін ${VERSION} — Балансери`,
             html: container,
+            size: 'medium',
             onBack: function () {
-                closeModal();
+                closeModal({ onClose: function () { Lampa.Controller.toggle('settings_component'); } });
                 return true;
             }
         });
 
         setTimeout(function () {
-            container.addClass('show'); // плавна анімація появи
             Lampa.Controller.collectionSet(container);
             Lampa.Controller.collectionFocus(container.find('.selector').first());
-
-            // Додаємо підсвітку елементу
-            container.find('.selector').first().addClass('focus');
-            container.on('hover:focus', '.selector', function () {
-                container.find('.selector').removeClass('focus');
-                $(this).addClass('focus');
-            });
-
-            enableOutsideClose(container);
-            updateTitle();
+            enableOutsideClose(container, { onClose: function () { Lampa.Controller.toggle('settings_component'); } });
+            updateTitle($('.modal__title'));
         }, 200);
     }
 
@@ -207,7 +153,7 @@
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
-            name: 'Мій мультиплагін ' + VERSION,
+            name: `Мій мультиплагін ${VERSION}`,
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
@@ -225,10 +171,10 @@
         initSettings();
 
         if (Lampa.Noty) {
-            Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
+            Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
         }
 
-        console.log('[MultiPlugin ' + VERSION + '] Loaded');
+        console.log(`[MultiPlugin ${VERSION}] Loaded`);
     }
 
     if (Lampa.Listener) {
