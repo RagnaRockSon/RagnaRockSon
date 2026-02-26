@@ -288,9 +288,9 @@ function start(){
     loadSources();
     loadActive();
     init();
-}
 
 if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
+
 }
 
 if(Lampa.Listener){
