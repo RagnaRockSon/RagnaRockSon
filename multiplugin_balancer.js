@@ -1,3 +1,78 @@
+(function () {
+'use strict';
+
+if (!window.Lampa) return;
+
+const VERSION = 'v4.5.3';
+
+var sources = [
+    { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
+    { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
+    { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
+    { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
+];
+
+var tempState = {};
+var hasChanges = false;
+var outsideHandler = null;
+
+function injectCSS() {
+    if (document.getElementById('multi-style')) return;
+
+    var style = document.createElement('style');
+    style.id = 'multi-style';
+    style.innerHTML = `
+        .multi-container { padding:15px; transition: all 0.3s ease; }
+        .multi-item { display:flex; align-items:center; justify-content:space-between; padding:10px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.3s ease; }
+        .multi-left { width:40%; font-size:14px; color:#fff; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .multi-right { width:60%; display:flex; justify-content:flex-end; gap:8px; }
+        .multi-btn { padding:6px 12px; border-radius:6px; font-size:12px; cursor:pointer; text-align:center; flex-shrink:0; }
+        .multi-toggle.enabled { background:#46b85a; color:#fff; }
+        .multi-toggle.disabled { background:#d24a4a; color:#fff; }
+        .multi-btn-edit { background:#156DD1; color:#fff; }
+        .multi-btn-delete { background:#d24a4a; color:#fff; }
+        .multi-btn-add { background:#46b85a; color:#fff; margin-bottom:10px; }
+        .multi-apply { text-align:center; margin-top:15px; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
+        .modal-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:10px; border-radius:5px; margin-bottom:10px; width:100%; box-sizing:border-box; }
+        .modal-input::placeholder { color:rgba(255,255,255,0.5); }
+    `;
+    document.head.appendChild(style);
+}
+
+function updateTitle(modalTitle) {
+    if (!modalTitle) return;
+    var title = hasChanges
+        ? `Мій мультиплагін ${VERSION} — Балансери ●`
+        : `Мій мультиплагін ${VERSION} — Балансери`;
+    modalTitle.text(title);
+}
+
+function enableOutsideClose(container, modal) {
+    setTimeout(function () {
+        outsideHandler = function (e) {
+            if (!$(e.target).closest(container).length) {
+                closeModal(modal);
+            }
+        };
+        $('.modal').on('mousedown.multi', outsideHandler);
+    }, 200);
+}
+
+function disableOutsideClose() {
+    $('.modal').off('mousedown.multi');
+    outsideHandler = null;
+}
+
+function closeModal(modal) {
+    disableOutsideClose();
+    if (modal && modal.onClose) modal.onClose();
+    Lampa.Modal.close();
+}
+
+function saveSourcestoStorage() {
+    Lampa.Storage.set('multi_sources', JSON.stringify(sources));
+}
+
 function openEditModal(index, callback, parentModal) {
     var src = sources[index];
     var formHtml = $(`
@@ -204,3 +279,56 @@ function openSourcesModal() {
         updateTitle($('.modal__title'));
     }, 200);
 }
+
+function loadActiveSources() {
+    sources.forEach(function (src) {
+        var enabled = Lampa.Storage.get('multi_' + src.name, false);
+        if (!enabled) return;
+        if (document.querySelector('script[src="' + src.url + '"]')) return;
+
+        var script = document.createElement('script');
+        script.src = src.url;
+        script.async = false;
+        document.body.appendChild(script);
+    });
+}
+
+function initSettings() {
+    var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
+    if (!SettingsApi || !SettingsApi.addComponent) return;
+
+    SettingsApi.addComponent({
+        component: 'multi_balancers',
+        name: `Мій мультиплагін ${VERSION}`,
+        icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
+    });
+
+    SettingsApi.addParam({
+        component: 'multi_balancers',
+        param: { name: 'multi_manage', type: 'button' },
+        field: { name: 'Керування балансерами' },
+        onChange: openSourcesModal
+    });
+}
+
+function start() {
+    injectCSS();
+    loadActiveSources();
+    initSettings();
+
+    if (Lampa.Noty) {
+        Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
+    }
+
+    console.log(`[MultiPlugin ${VERSION}] Loaded`);
+}
+
+if (Lampa.Listener) {
+    Lampa.Listener.follow('app', function (e) {
+        if (e && e.type === 'ready') start();
+    });
+} else {
+    start();
+}
+
+})();
