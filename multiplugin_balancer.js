@@ -3,7 +3,8 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.1.1';
+    const VERSION = 'v4.0';
+
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
         { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
@@ -17,33 +18,34 @@
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
+
         var style = document.createElement('style');
         style.id = 'multi-style';
         style.innerHTML = `
-            .multi-container { padding:20px; transition: all 0.25s ease; }
-            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.25s ease; }
-            .multi-item.focus { transform: scale(1.02); background: rgba(255,255,255,0.1); }
+            .multi-container { padding:20px; transition: all 0.3s ease; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.3s ease; }
+            .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
             .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; cursor:pointer; transition: all 0.3s ease; }
             .multi-toggle.enabled { background:#46b85a; }
             .multi-toggle.disabled { background:#d24a4a; }
-            .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
-            .multi-apply:hover { transform:scale(1.03); background:#1f82ff; }
+            .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
         `;
         document.head.appendChild(style);
     }
 
-    function updateTitle() {
+    function updateTitle(modalTitle) {
+        if (!modalTitle) return;
         var title = hasChanges
-            ? 'Мій мультиплагін ' + VERSION + ' — Балансери ●'
-            : 'Мій мультиплагін ' + VERSION + ' — Балансери';
-        $('.modal__title').text(title);
+            ? `Мій мультиплагін ${VERSION} — Балансери ●`
+            : `Мій мультиплагін ${VERSION} — Балансери`;
+        modalTitle.text(title);
     }
 
-    function enableOutsideClose(container) {
+    function enableOutsideClose(container, modal) {
         setTimeout(function () {
             outsideHandler = function (e) {
-                if (!$(e.target).closest('.multi-container').length) {
-                    closeModal();
+                if (!$(e.target).closest(container).length) {
+                    closeModal(modal);
                 }
             };
             $('.modal').on('mousedown.multi', outsideHandler);
@@ -55,23 +57,10 @@
         outsideHandler = null;
     }
 
-    function closeModal() {
+    function closeModal(modal) {
         disableOutsideClose();
+        if (modal && modal.onClose) modal.onClose();
         Lampa.Modal.close();
-    }
-
-    // --- Функція чекання контейнера для collectionFocus ---
-    function waitForContainer(container, callback) {
-        var tries = 0;
-        var interval = setInterval(function() {
-            if (container && container.length && container.find('.selector').length) {
-                clearInterval(interval);
-                callback();
-            } else if (tries++ > 20) { // максимум 20 спроб
-                clearInterval(interval);
-                console.warn('MultiPlugin: container not found for collectionFocus');
-            }
-        }, 50);
     }
 
     function openSourcesModal() {
@@ -103,7 +92,7 @@
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
-                updateTitle();
+                updateTitle($('.modal__title'));
             });
 
             container.append(item);
@@ -111,10 +100,13 @@
 
         applyBtn.on('hover:enter', function () {
             if (!hasChanges) return;
+
             Object.keys(tempState).forEach(function (k) {
                 Lampa.Storage.set(k, tempState[k]);
             });
+
             disableOutsideClose();
+
             if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
                 Lampa.Manifest.app_reload();
             } else {
@@ -125,21 +117,21 @@
         container.append(applyBtn);
 
         Lampa.Modal.open({
-            title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
+            title: `Мій мультиплагін ${VERSION} — Балансери`,
             html: container,
+            size: 'medium',
             onBack: function () {
-                closeModal();
+                closeModal({ onClose: function () { Lampa.Controller.toggle('settings_component'); } });
                 return true;
             }
         });
 
-        // --- чекати контейнер перед collectionFocus ---
-        waitForContainer(container, function() {
+        setTimeout(function () {
             Lampa.Controller.collectionSet(container);
             Lampa.Controller.collectionFocus(container.find('.selector').first());
-            enableOutsideClose(container);
-            updateTitle();
-        });
+            enableOutsideClose(container, { onClose: function () { Lampa.Controller.toggle('settings_component'); } });
+            updateTitle($('.modal__title'));
+        }, 200);
     }
 
     function loadActiveSources() {
@@ -161,7 +153,7 @@
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
-            name: 'Мій мультиплагін ' + VERSION,
+            name: `Мій мультиплагін ${VERSION}`,
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
@@ -177,8 +169,12 @@
         injectCSS();
         loadActiveSources();
         initSettings();
-        if (Lampa.Noty) Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
-        console.log('[MultiPlugin ' + VERSION + '] Loaded');
+
+        if (Lampa.Noty) {
+            Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
+        }
+
+        console.log(`[MultiPlugin ${VERSION}] Loaded`);
     }
 
     if (Lampa.Listener) {
