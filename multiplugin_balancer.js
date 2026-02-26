@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.4.8';
+    const VERSION = 'v4.4.7';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -23,38 +23,61 @@
         style.id = 'multi-style';
         style.innerHTML = `
             .multi-container { padding:15px; transition: all 0.3s ease; }
-            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:12px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.2s ease; }
-            .multi-left { flex:1; }
-            .multi-left strong { font-size:16px; display:block; }
-            .multi-right { display:flex; gap:8px; flex-shrink:0; align-items:center; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:8px; transition: all 0.2s ease; }
+            .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.01); }
+            .multi-left { flex:1; font-size:16px; color:#fff; }
+            .multi-right { display:flex; gap:8px; flex-shrink:0; }
 
             /* Кнопки */
             .multi-toggle, .multi-btn-edit, .multi-btn-delete {
-                height:36px;
-                min-width:90px;
-                line-height:36px;
-                font-size:15px;
+                display:flex;
+                align-items:center;
+                justify-content:center;
+                padding:0 12px;
                 border-radius:8px;
-                padding:0 10px;
-                text-align:center;
+                height:36px;
+                min-width:60px;
+                font-size:14px;
                 font-weight:bold;
                 cursor:pointer;
-                color:#fff;
                 transition: all 0.2s ease;
+                color:#fff;
             }
+
             .multi-toggle.enabled { background:#46b85a; }
             .multi-toggle.disabled { background:#d24a4a; }
             .multi-btn-edit { background:#FF9800; }
             .multi-btn-delete { background:#d24a4a; }
 
-            .multi-btn-add { margin-top:12px; width:100%; padding:12px; border-radius:10px; text-align:center; font-weight:bold; background:#156DD1; color:#fff; cursor:pointer; }
-            .multi-apply { text-align:center; margin-top:10px; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
+            .multi-btn-add, .multi-apply {
+                width:100%;
+                text-align:center;
+                padding:12px;
+                border-radius:10px;
+                margin-top:10px;
+                font-weight:bold;
+                cursor:pointer;
+                transition: all 0.2s ease;
+            }
+            .multi-btn-add { background:#156DD1; color:#fff; }
+            .multi-apply { background:#156DD1; color:#fff; display:none; }
 
-            /* Модалки Add/Edit джерела */
-            .modal-input { width:100%; padding:12px; margin-bottom:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; box-sizing:border-box; }
+            /* Модалки Add/Edit */
+            .modal-input {
+                width:100%;
+                padding:10px 12px;
+                margin-bottom:12px;
+                border-radius:8px;
+                border:1px solid rgba(255,255,255,0.2);
+                background:rgba(0,0,0,0.2);
+                color:#fff;
+                font-size:14px;
+                box-sizing:border-box;
+            }
             .modal-input::placeholder { color:rgba(255,255,255,0.5); }
+
             .modal-buttons { display:flex; gap:10px; margin-top:10px; }
-            .modal-button { flex:1; padding:12px; text-align:center; border-radius:8px; cursor:pointer; font-weight:bold; color:#fff; font-size:15px; transition: all 0.2s ease; }
+            .modal-button { flex:1; padding:10px; text-align:center; border-radius:8px; cursor:pointer; font-weight:bold; color:#fff; transition: all 0.2s ease; }
             .modal-button.save { background:#46b85a; }
             .modal-button.cancel { background:#555; }
         `;
@@ -63,7 +86,9 @@
 
     function updateTitle(modalTitle) {
         if (!modalTitle) return;
-        var title = hasChanges ? `Мій мультиплагін ${VERSION} — Балансери ●` : `Мій мультиплагін ${VERSION} — Балансери`;
+        var title = hasChanges
+            ? `Мій мультиплагін ${VERSION} — Балансери ●`
+            : `Мій мультиплагін ${VERSION} — Балансери`;
         modalTitle.text(title);
     }
 
@@ -173,11 +198,11 @@
 
                 var item = $(`
                     <div class="multi-item selector" data-index="${index}">
-                        <div class="multi-left"><strong>${src.name}</strong></div>
+                        <div class="multi-left">${src.name}</div>
                         <div class="multi-right">
                             <div class="multi-toggle selector ${current?'enabled':'disabled'}" data-index="${index}">${current?'Увімкнено':'Вимкнено'}</div>
-                            <div class="multi-btn-edit selector" data-index="${index}">Редагувати</div>
-                            <div class="multi-btn-delete selector" data-index="${index}">Видалити</div>
+                            <div class="multi-btn-edit selector" data-index="${index}">✏️</div>
+                            <div class="multi-btn-delete selector" data-index="${index}">🗑️</div>
                         </div>
                     </div>
                 `);
