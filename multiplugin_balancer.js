@@ -305,6 +305,10 @@ function start(){
     loadSources();
     loadActive();
     init();
+
+    // ✅ Сповіщення про завантаження
+    if (Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
+    console.log(`[MultiPlugin ${VERSION}] Loaded`);
 }
 
 if(Lampa.Listener){
