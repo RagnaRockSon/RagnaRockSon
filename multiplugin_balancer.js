@@ -18,9 +18,11 @@ var viewMode = 'list'; // list | add | edit
 var editIndex = null;
 var wrapper;
 
-// ================= CSS =================
+/* ================= CSS ================= */
+
 function injectCSS() {
     if (document.getElementById('multi-style')) return;
+
     var style = document.createElement('style');
     style.id = 'multi-style';
     style.innerHTML = `
@@ -36,11 +38,19 @@ function injectCSS() {
         .add { background:#156DD1; margin-top:10px; }
         .apply { background:#156DD1; margin-top:12px; display:none; }
         .modal-input { width:100%; padding:10px; margin-bottom:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff; }
+        /* Стиль підмодалки підтвердження */
+        .confirm-modal { padding:20px; text-align:center; }
+        .confirm-modal .confirm-title { margin-bottom:15px; font-size:15px; font-weight:bold; }
+        .confirm-modal .confirm-buttons { display:flex; gap:10px; justify-content:center; margin-top:10px; }
+        .confirm-modal .confirm-btn { flex:1; padding:10px 0; border-radius:6px; cursor:pointer; color:#fff; font-weight:bold; }
+        .confirm-modal .confirm-yes { background:#d24a4a; }
+        .confirm-modal .confirm-no { background:#555; }
     `;
     document.head.appendChild(style);
 }
 
-// ================= STORAGE =================
+/* ================= STORAGE ================= */
+
 function loadSources() {
     var saved = Lampa.Storage.get('multi_sources', null);
     if (saved) {
@@ -53,7 +63,8 @@ function saveSources() {
     Lampa.Storage.set('multi_sources', JSON.stringify(sources));
 }
 
-// ================= VIEW RENDER =================
+/* ================= VIEW RENDER ================= */
+
 function renderList() {
     viewMode = 'list';
     wrapper.empty();
@@ -81,6 +92,7 @@ function renderList() {
             </div>
         `);
 
+        // toggle
         item.find('[data-key]').on('hover:enter', function(){
             var k = $(this).data('key');
             tempState[k] = !tempState[k];
@@ -91,24 +103,28 @@ function renderList() {
             applyBtn.show();
         });
 
+        // edit
         item.find('.edit').on('hover:enter', function(){
             editIndex = $(this).data('index');
             renderEdit();
         });
 
+        // delete
         item.find('.delete').on('hover:enter', function(){
-            var i = $(this).data('index');
-            sources.splice(i,1);
-            saveSources();
-            renderList();
+            confirmDelete(index);
         });
 
         container.append(item);
     });
 
-    addBtn.on('hover:enter', function(){ renderAdd(); });
+    addBtn.on('hover:enter', function(){
+        renderAdd();
+    });
+
     applyBtn.on('hover:enter', function(){
-        Object.keys(tempState).forEach(function(k){ Lampa.Storage.set(k,tempState[k]); });
+        Object.keys(tempState).forEach(function(k){
+            Lampa.Storage.set(k,tempState[k]);
+        });
         if(Lampa.Manifest && Lampa.Manifest.app_reload) Lampa.Manifest.app_reload();
         else location.reload();
     });
@@ -136,9 +152,6 @@ function renderAdd(){
         </div>
     `);
 
-    // === Єдиний обробник клавіш для підмодалки
-    html.find('input').on('keydown', function(e){ e.stopPropagation(); });
-
     html.find('.enabled').on('hover:enter',function(){
         var name = html.find('.add-name').val().trim();
         var url = html.find('.add-url').val().trim();
@@ -149,6 +162,10 @@ function renderAdd(){
     });
 
     html.find('.delete').on('hover:enter',renderList);
+
+    // блокування Backspace
+    html.find('input').on('keydown',function(e){ e.stopPropagation(); });
+
     wrapper.append(html);
 
     setTimeout(function(){
@@ -172,8 +189,6 @@ function renderEdit(){
         </div>
     `);
 
-    html.find('input').on('keydown', function(e){ e.stopPropagation(); });
-
     html.find('.enabled').on('hover:enter',function(){
         var name = html.find('.edit-name').val().trim();
         var url = html.find('.edit-url').val().trim();
@@ -184,6 +199,10 @@ function renderEdit(){
     });
 
     html.find('.delete').on('hover:enter',renderList);
+
+    // блокування Backspace
+    html.find('input').on('keydown',function(e){ e.stopPropagation(); });
+
     wrapper.append(html);
 
     setTimeout(function(){
@@ -192,29 +211,58 @@ function renderEdit(){
     },100);
 }
 
-// ================= MAIN MODAL =================
+/* ================= CONFIRM DELETE ================= */
+
+function confirmDelete(idx){
+    var html = $(`
+        <div class="confirm-modal">
+            <div class="confirm-title">Видалити джерело?</div>
+            <div class="confirm-buttons">
+                <div class="confirm-btn confirm-yes selector">Підтвердити</div>
+                <div class="confirm-btn confirm-no selector">Скасувати</div>
+            </div>
+        </div>
+    `);
+
+    html.find('.confirm-yes').on('hover:enter', function(){
+        sources.splice(idx,1);
+        saveSources();
+        Lampa.Modal.close(); // закриває підмодалку
+        renderList();
+    });
+
+    html.find('.confirm-no').on('hover:enter', function(){
+        Lampa.Modal.close();
+        renderList();
+    });
+
+    // блокування Backspace
+    html.find('.confirm-btn').on('keydown', function(e){ e.stopPropagation(); });
+
+    Lampa.Modal.open({
+        title: 'Підтвердження',
+        html: html,
+        size:'small',
+        onBack:function(){ renderList(); return true; }
+    });
+}
+
+/* ================= MAIN MODAL ================= */
+
 function openSourcesModal(){
+
     wrapper = $('<div></div>');
     renderList();
-
-    // === Єдиний обробник закриття
-    function handleBackspace(e){
-        if(viewMode==='list') return; // дозволяємо закриття головного меню
-        if($(e.target).is('input')) return; // не закривати, якщо фокус на інпуті
-        renderList(); 
-        e.preventDefault();
-    }
-
-    $(document).off('keydown.multi').on('keydown.multi', function(e){
-        if(e.key==='Backspace' || e.key==='Delete') handleBackspace(e);
-    });
 
     Lampa.Modal.open({
         title: `Мій мультиплагін ${VERSION} — Балансери`,
         html: wrapper,
         size:'medium',
         onBack:function(){
-            if(viewMode!=='list'){ renderList(); return true; }
+            if(viewMode!=='list'){
+                renderList();
+                return true;
+            }
             Lampa.Modal.close();
             Lampa.Controller.toggle('settings_component');
             return true;
@@ -222,7 +270,8 @@ function openSourcesModal(){
     });
 }
 
-// ================= INIT =================
+/* ================= INIT ================= */
+
 function loadActive(){
     sources.forEach(function(src){
         if(!Lampa.Storage.get('multi_'+src.name,false)) return;
@@ -259,7 +308,9 @@ function start(){
 }
 
 if(Lampa.Listener){
-    Lampa.Listener.follow('app',function(e){ if(e&&e.type==='ready') start(); });
+    Lampa.Listener.follow('app',function(e){
+        if(e&&e.type==='ready') start();
+    });
 }else start();
 
 })();
