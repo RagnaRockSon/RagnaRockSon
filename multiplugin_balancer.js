@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.5.7.1';
+const VERSION = 'v4.5.8';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -50,24 +50,34 @@ function updateTitle(modalTitle) {
     modalTitle.text(title);
 }
 
-function enableOutsideClose(container, modal) {
-    setTimeout(function () {
+// === Єдиний обробник модалок ===
+function enableModalHandler(container, modal) {
+    disableModalHandler();
+    setTimeout(() => {
         outsideHandler = function (e) {
             if (!$(e.target).closest(container).length && !$(e.target).closest('.modal').length) {
                 closeModal(modal);
             }
         };
         $('.modal').on('mousedown.multi', outsideHandler);
+        // Блокуємо Backspace/Del для закриття головної модалки
+        $(document).on('keydown.multi', function(e){
+            var targetTag = e.target.tagName.toLowerCase();
+            if (targetTag === 'input' || targetTag === 'textarea') {
+                e.stopPropagation();
+            }
+        });
     }, 200);
 }
 
-function disableOutsideClose() {
+function disableModalHandler() {
     $('.modal').off('mousedown.multi');
+    $(document).off('keydown.multi');
     outsideHandler = null;
 }
 
 function closeModal(modal) {
-    disableOutsideClose();
+    disableModalHandler();
     if (modal && modal.onClose) modal.onClose();
     Lampa.Modal.close();
 }
@@ -75,11 +85,8 @@ function closeModal(modal) {
 function loadSourcesFromStorage() {
     var saved = Lampa.Storage.get('multi_sources', null);
     if (saved) {
-        try {
-            sources = JSON.parse(saved);
-        } catch (e) {
-            console.error('[MultiPlugin] Error loading sources:', e);
-        }
+        try { sources = JSON.parse(saved); } 
+        catch (e) { console.error('[MultiPlugin] Error loading sources:', e); }
     }
 }
 
@@ -107,11 +114,6 @@ function openEditModal(index, callback) {
         </div>
     `);
 
-    // === Нове: блокування Backspace/Del для головної модалки
-    formHtml.find('input').on('keydown', function(e){
-        e.stopPropagation();
-    });
-
     var saveBtn = formHtml.find('div').eq(2).find('.selector').first();
     var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
 
@@ -126,9 +128,7 @@ function openEditModal(index, callback) {
         if (callback) callback();
     });
 
-    cancelBtn.on('hover:enter', function () {
-        Lampa.Modal.close();
-    });
+    cancelBtn.on('hover:enter', function () { Lampa.Modal.close(); });
 
     Lampa.Modal.open({
         title: 'Редагування джерела',
@@ -156,11 +156,6 @@ function openAddModal(callback) {
         </div>
     `);
 
-    // === Нове: блокування Backspace/Del для головної модалки
-    formHtml.find('input').on('keydown', function(e){
-        e.stopPropagation();
-    });
-
     var addBtn = formHtml.find('div').eq(2).find('.selector').first();
     var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
 
@@ -175,9 +170,7 @@ function openAddModal(callback) {
         if (callback) callback();
     });
 
-    cancelBtn.on('hover:enter', function () {
-        Lampa.Modal.close();
-    });
+    cancelBtn.on('hover:enter', function () { Lampa.Modal.close(); });
 
     Lampa.Modal.open({
         title: 'Додавання нового джерела',
@@ -198,7 +191,6 @@ function openSourcesModal() {
 
     function renderSources() {
         container.find('.multi-item').remove();
-
         sources.forEach(function (src, index) {
             var key = 'multi_' + src.name;
             var current = Lampa.Storage.get(key, false);
@@ -215,20 +207,17 @@ function openSourcesModal() {
                 </div>
             `);
 
-            // Toggle
             item.find('.multi-toggle').on('hover:enter', function () {
                 var key = $(this).data('key');
                 tempState[key] = !tempState[key];
-                $(this).removeClass('enabled disabled').addClass(tempState[key] ? 'enabled' : 'disabled').text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
+                $(this).removeClass('enabled disabled').addClass(tempState[key] ? 'enabled' : 'disabled')
+                       .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
                 updateTitle($('.modal__title'));
             });
 
-            // Edit
             item.find('.multi-btn-edit').on('hover:enter', function () { openEditModal($(this).data('index'), renderSources); });
-
-            // Delete
             item.find('.multi-btn-delete').on('hover:enter', function () {
                 var idx = $(this).data('index');
                 sources.splice(idx, 1);
@@ -252,7 +241,7 @@ function openSourcesModal() {
     applyBtn.on('hover:enter', function () {
         if (!hasChanges) return;
         Object.keys(tempState).forEach(function (k) { Lampa.Storage.set(k, tempState[k]); });
-        disableOutsideClose();
+        disableModalHandler();
         if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') Lampa.Manifest.app_reload();
         else location.reload();
     });
@@ -267,7 +256,7 @@ function openSourcesModal() {
     setTimeout(function () {
         Lampa.Controller.collectionSet(container);
         Lampa.Controller.collectionFocus(container.find('.selector').first());
-        enableOutsideClose(container, { onClose: function () { Lampa.Controller.toggle('settings_component'); } });
+        enableModalHandler(container, { onClose: function () { Lampa.Controller.toggle('settings_component'); } });
         updateTitle($('.modal__title'));
     }, 200);
 }
@@ -308,7 +297,6 @@ function start() {
     loadSourcesFromStorage();
     loadActiveSources();
     initSettings();
-
     if (Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
     console.log(`[MultiPlugin ${VERSION}] Loaded`);
 }
