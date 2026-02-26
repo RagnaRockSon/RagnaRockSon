@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.5.7.1';
+const VERSION = 'v4.5.7';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
