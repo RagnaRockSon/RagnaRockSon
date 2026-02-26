@@ -3,7 +3,7 @@
 
 if(!window.Lampa) return;
 
-const VERSION = 'v1.0';
+const VERSION = 'v1.1';
 
 var wrapper;
 var sources = [
@@ -81,7 +81,7 @@ function addMovieButton(){
 
     Lampa.Card.addButton('filmhub_plus', {
         name:'FilmHub+',
-        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>',
+        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><path d="M20 4H4c-1.1 0-2 .9-2 2v12c0 1.1.9 2 2 2h16c1.1 0 2-.9 2-2V6c0-1.1-.9-2-2-2zm-2 12H6V8h12v8zm-6-6l4 3H8l4-3z"/></svg>',
         onClick:function(card){
             renderModal(card.movie||{title:'Фільм/Серіал'});
         }
