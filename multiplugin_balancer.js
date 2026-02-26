@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.4.6';
+    const VERSION = 'v4.4.7';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -24,24 +24,24 @@
         style.id = 'multi-style';
         style.innerHTML = `
             .multi-container { padding:15px; transition: all 0.3s ease; }
-            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:8px; transition: all 0.2s ease; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px 12px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.2s ease; }
             .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.01); }
-            .multi-left { flex:1; overflow:hidden; }
+            .multi-left { flex:1; overflow:hidden; display:flex; align-items:center; }
             .multi-left strong { font-size:16px; white-space:nowrap; text-overflow:ellipsis; overflow:hidden; display:block; }
-            .multi-right { display:flex; gap:5px; flex-shrink:0; }
-            .multi-toggle, .multi-btn { padding:6px 10px; border-radius:8px; min-width:70px; text-align:center; color:#fff; cursor:pointer; font-size:14px; transition: all 0.2s ease; height:32px; line-height:32px; }
+            .multi-right { display:flex; gap:8px; flex-shrink:0; align-items:center; }
+            .multi-toggle, .multi-btn { padding:6px 12px; border-radius:8px; text-align:center; color:#fff; cursor:pointer; font-size:14px; height:36px; line-height:36px; min-width:80px; transition: all 0.2s ease; display:flex; justify-content:center; align-items:center; }
             .multi-toggle.enabled { background:#46b85a; }
             .multi-toggle.disabled { background:#d24a4a; }
-            .multi-btn-edit { background:#FF9800; }
-            .multi-btn-delete { background:#d24a4a; }
+            .multi-btn-edit { background:#FF9800; min-width:90px; }
+            .multi-btn-delete { background:#d24a4a; min-width:90px; }
             .multi-btn-add { background:#156DD1; margin-top:10px; width:100%; padding:12px; border-radius:10px; text-align:center; font-weight:bold; }
             .multi-apply { text-align:center; margin-top:10px; padding:12px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.2s ease; }
 
             /* Модалки Add/Edit джерела */
-            .modal-input { width:100%; padding:10px 12px; margin-bottom:12px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; box-sizing:border-box; }
+            .modal-input { width:100%; padding:12px 14px; margin-bottom:14px; border-radius:8px; border:1px solid rgba(255,255,255,0.2); background:rgba(0,0,0,0.2); color:#fff; font-size:14px; box-sizing:border-box; }
             .modal-input::placeholder { color:rgba(255,255,255,0.5); }
             .modal-buttons { display:flex; gap:10px; margin-top:10px; }
-            .modal-button { flex:1; padding:10px; text-align:center; border-radius:8px; cursor:pointer; font-weight:bold; color:#fff; transition: all 0.2s ease; }
+            .modal-button { flex:1; padding:12px; text-align:center; border-radius:8px; cursor:pointer; font-weight:bold; color:#fff; display:flex; justify-content:center; align-items:center; font-size:14px; }
             .modal-button.save { background:#46b85a; }
             .modal-button.cancel { background:#555; }
         `;
@@ -167,13 +167,12 @@
                         <div class="multi-left"><strong>${src.name}</strong></div>
                         <div class="multi-right">
                             <div class="multi-toggle selector ${current?'enabled':'disabled'}" data-index="${index}">${current?'Увімкнено':'Вимкнено'}</div>
-                            <div class="multi-btn-edit selector" data-index="${index}">✏️</div>
-                            <div class="multi-btn-delete selector" data-index="${index}">🗑️</div>
+                            <div class="multi-btn-edit selector" data-index="${index}">Редагувати</div>
+                            <div class="multi-btn-delete selector" data-index="${index}">Видалити</div>
                         </div>
                     </div>
                 `);
 
-                // Toggle працює як кнопка
                 item.find('.multi-toggle').on('hover:enter', function(){
                     var idx = $(this).data('index');
                     var key = 'multi_'+sources[idx].name;
