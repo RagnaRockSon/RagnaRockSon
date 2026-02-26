@@ -1,63 +1,96 @@
-(function(){
+(function() {
+    'use strict';
 
-if(!window.Lampa) return;
+    const VERSION = 'FilmHub+ v1.0';
 
-console.log('FilmHub+ loaded');
+    // Повідомлення про завантаження плагіну
+    if (Lampa.Noty) Lampa.Noty.show(`Мій плагін ${VERSION} завантажено`);
 
-var component = {};
+    // --- Додати кнопку у картку фільму ---
+    function addFilmHubButton(card) {
+        if (!card || card.find('.filmhub-button').length) return;
 
-component.create = function(){
-    var movie = this.activity.movie;
+        // Створюємо кнопку
+        const btn = $('<div class="lampac--button filmhub-button">FilmHub+</div>');
 
-    this.activity.render(`
-        <div style="padding:50px">
-            <h1>🎬 FilmHub+</h1>
-            <h2>${movie.title || movie.name}</h2>
-        </div>
-    `);
-};
-
-component.destroy = function(){};
-
-Lampa.Component.add('filmhub_plus', component);
-
-function insertButton(){
-
-    var buttons = document.querySelector('.full-start__buttons');
-
-    if(!buttons) return;
-    if(buttons.querySelector('.filmhub-btn')) return;
-
-    var btn = document.createElement('div');
-    btn.className = 'full-start__button selector filmhub-btn';
-    btn.innerHTML = `
-        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
-            <path d="M4 4h16v16H4z"/>
-            <path d="M10 8l6 4-6 4z" fill="#000"/>
-        </svg>
-        <span>FilmHub+</span>
-    `;
-
-    btn.addEventListener('click', function(){
-
-        var movie = Lampa.Activity.active().movie;
-
-        Lampa.Activity.push({
-            component: 'filmhub_plus',
-            movie: movie
+        // Додаємо іконку (можна змінити на свою)
+        btn.css({
+            'background-image': 'url(./img/filmhub-icon.png)',
+            'background-size': 'contain',
+            'background-repeat': 'no-repeat',
+            'background-position': 'center',
+            'width': '4em',
+            'height': '4em',
+            'margin-right': '0.5em'
         });
 
-    });
+        btn.on('hover:enter', function() {
+            openFilmHub(card.movie);
+        });
 
-    buttons.prepend(btn); // 🔥 ВСТАВЛЯЄМО ЗЛІВА
-}
-
-Lampa.Listener.follow('activity', function(e){
-
-    if(e.component === 'full'){
-        setTimeout(insertButton, 300);
+        // Вставляємо кнопку зліва від оригінальних
+        card.find('.controls').prepend(btn);
     }
 
-});
+    // --- Відкрити FilmHub+ ---
+    function openFilmHub(movie) {
+        if (!movie) return;
+
+        const network = new Lampa.Reguest();
+        const scroll = new Lampa.Scroll({mask: true, over: true});
+
+        // UI контейнер
+        const container = $('<div class="filmhub-container"></div>');
+        scroll.body().append(container);
+        Lampa.Controller.enable('content');
+
+        // Запит доступних потоків з оригінальних плагінів
+        network.timeout(10000);
+        const url = `http://lampaua.mooo.com/lite/events?movie_id=${encodeURIComponent(movie.id)}`;
+
+        network.silent(url, function(json) {
+            if (!json || !json.online) {
+                Lampa.Noty.show('Потоки не знайдені');
+                return;
+            }
+
+            // Створюємо список
+            json.online.forEach(function(source) {
+                const name = source.name || 'Без назви';
+                const item = $(`<div class="filmhub-source">${name}</div>`);
+                container.append(item);
+
+                item.on('hover:enter', function() {
+                    playFilmHubStream(source, movie);
+                });
+            });
+
+            scroll.update();
+        }, function() {
+            Lampa.Noty.show('Помилка при завантаженні потоків');
+        });
+    }
+
+    // --- Відтворення потоку через Lampa.Player ---
+    function playFilmHubStream(file, movie) {
+        if (!file || !file.url) return;
+
+        const element = {
+            title: movie.title || movie.original_title,
+            url: file.url,
+            quality: file.qualitys,
+            subtitles: file.subtitles,
+            season: file.season,
+            episode: file.episode,
+            voice_name: file.voice_name
+        };
+
+        Lampa.Player.play(element);
+    }
+
+    // --- Підключення до карток фільмів ---
+    Lampa.Card.add(function(card) {
+        addFilmHubButton(card);
+    });
 
 })();
