@@ -12,9 +12,6 @@
 
     var tempState = {};
 
-    // ==============================
-    // Безпечне додавання CSS (1 раз)
-    // ==============================
     function injectCSS() {
         if (document.getElementById('multi-plugin-style')) return;
 
@@ -36,9 +33,6 @@
         document.head.appendChild(style);
     }
 
-    // ==============================
-    // Завантаження активних
-    // ==============================
     function loadActiveSources() {
         sources.forEach(function (src) {
             var enabled = Lampa.Storage.get('multi_' + src.name, false);
@@ -53,9 +47,6 @@
         });
     }
 
-    // ==============================
-    // Модаль балансерів
-    // ==============================
     function openSourcesModal() {
 
         tempState = {};
@@ -65,129 +56,32 @@
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
+        function closeModal() {
+            $(document).off('click.multiOutside');
+            if (Lampa.Modal && Lampa.Modal.close) {
+                Lampa.Modal.close();
+            }
+        }
+
+        // ✅ СТАБІЛЬНИЙ outside click
+        setTimeout(function () {
+            $(document).on('click.multiOutside', function (e) {
+
+                if (!container[0]) return;
+
+                var clickedInside = $(e.target).closest('.multi-container').length > 0;
+                var clickedModal = $(e.target).closest('.lampa-modal').length > 0;
+
+                if (!clickedInside && clickedModal) {
+                    closeModal();
+                }
+            });
+        }, 150);
+
         sources.forEach(function (src) {
 
             var key = 'multi_' + src.name;
             var current = Lampa.Storage.get(key, false);
             tempState[key] = current;
 
-            var item = $(`
-                <div class="multi-item selector">
-                    <div>${src.name}</div>
-                    <div class="multi-toggle ${current ? 'enabled' : 'disabled'}">
-                        ${current ? 'Увімкнено' : 'Вимкнено'}
-                    </div>
-                </div>
-            `);
-
-            item.on('hover:enter', function () {
-
-                tempState[key] = !tempState[key];
-
-                item.find('.multi-toggle')
-                    .removeClass('enabled disabled')
-                    .addClass(tempState[key] ? 'enabled' : 'disabled')
-                    .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
-
-                hasChanges = true;
-                applyButton.show();
-            });
-
-            container.append(item);
-        });
-
-        // ==============================
-        // Кнопка застосувати
-        // ==============================
-        applyButton.on('hover:enter', function () {
-
-            if (!hasChanges) return;
-
-            if (Lampa.Modal && Lampa.Modal.confirm) {
-                Lampa.Modal.confirm({
-                    title: 'Підтвердження',
-                    text: 'Застосувати зміни та перезавантажити Lampa?',
-                    yes: function () {
-
-                        Object.keys(tempState).forEach(function (k) {
-                            Lampa.Storage.set(k, tempState[k]);
-                        });
-
-                        if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
-                            Lampa.Manifest.app_reload();
-                        } else {
-                            location.reload();
-                        }
-                    }
-                });
-            } else {
-                Object.keys(tempState).forEach(function (k) {
-                    Lampa.Storage.set(k, tempState[k]);
-                });
-                location.reload();
-            }
-        });
-
-        // ==============================
-        // Назад
-        // ==============================
-        backButton.on('hover:enter', function () {
-            if (Lampa.Modal && Lampa.Modal.close) {
-                Lampa.Modal.close();
-            }
-        });
-
-        container.append(applyButton).append(backButton);
-
-        if (Lampa.Modal && Lampa.Modal.open) {
-            Lampa.Modal.open({
-                title: 'Мій мультиплагін v1.3 — Балансери',
-                html: container
-            });
-        }
-
-        if (Lampa.Controller) {
-            Lampa.Controller.collectionSet(container);
-            Lampa.Controller.collectionFocus(container.find('.selector').first());
-        }
-    }
-
-    // ==============================
-    // Налаштування
-    // ==============================
-    function initSettings() {
-
-        var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
-        if (!SettingsApi || !SettingsApi.addComponent) return;
-
-        SettingsApi.addComponent({
-            component: 'multi_balancers',
-            name: 'Мій мультиплагін v1.3',
-            icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-        });
-
-        SettingsApi.addParam({
-            component: 'multi_balancers',
-            param: { name: 'multi_manage', type: 'button' },
-            field: { name: 'Керування балансерами' },
-            onChange: function () {
-                openSourcesModal();
-            }
-        });
-    }
-
-    function start() {
-        injectCSS();
-        loadActiveSources();
-        initSettings();
-    }
-
-    if (Lampa.Listener) {
-        Lampa.Listener.follow('app', function (e) {
-            if (e && e.type === 'ready') start();
-        });
-    } else {
-        start();
-    }
-
-})();
+            var item
