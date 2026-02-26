@@ -3,7 +3,7 @@
 
 if(!window.Lampa) return;
 
-const VERSION = 'v1.0.0';
+const VERSION = 'v1.0.1';
 var wrapper;
 var pluginsSources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -21,6 +21,7 @@ function injectCSS(){
         .filmhub-container{padding:15px;}
         .filmhub-item{padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.05);border-radius:8px;cursor:pointer;color:#fff;}
         .filmhub-title{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
+        .filmhub-button{padding:8px 10px;border-radius:6px;background:#156DD1;color:#fff;cursor:pointer;margin-top:5px;display:inline-block;}
     `;
     document.head.appendChild(style);
 }
@@ -44,14 +45,12 @@ function renderFilmHub(){
     pluginsSources.forEach(src=>{
         var item = $(`<div class="filmhub-item selector"><div class="filmhub-title">${src.name}</div></div>`);
         item.on('hover:enter', function(){
-            // тут можна підключати логіку підвантаження фільмів/серій із цього джерела
             if(Lampa.Noty) Lampa.Noty.show(`Вибрано джерело: ${src.name}`);
         });
         container.append(item);
     });
 
     wrapper.append(container);
-
     setTimeout(function(){
         Lampa.Controller.collectionSet(wrapper);
         Lampa.Controller.collectionFocus(wrapper.find('.selector').first());
@@ -75,10 +74,29 @@ function openFilmHubModal(){
     });
 }
 
+// ================= HIDE OTHER PLUGINS =================
+function hideOtherPlugins(){
+    if(!Lampa.SettingsApi || !Lampa.SettingsApi.components) return;
+    Object.keys(Lampa.SettingsApi.components).forEach(c=>{
+        if(c!=='filmhub_plus'){
+            Lampa.SettingsApi.components[c].hidden = true;
+        }
+    });
+}
+
+// ================= ADD BUTTON TO MOVIE CARD =================
+function addFilmHubButton(card){
+    if(!card || card.find('.filmhub-button').length) return;
+    var btn = $('<div class="filmhub-button selector">Відкрити FilmHub+</div>');
+    btn.on('hover:enter', openFilmHubModal);
+    card.append(btn);
+}
+
 // ================= INIT =================
 function init(){
     injectCSS();
     loadPluginSources();
+    hideOtherPlugins();
 
     var S = Lampa.SettingsApi||Lampa.Settings;
     if(!S||!S.addComponent) return;
@@ -95,6 +113,13 @@ function init(){
         field:{name:'Відкрити FilmHub+'},
         onChange: openFilmHubModal
     });
+
+    // Кнопка в картці фільму/серіалу
+    if(Lampa.Listener){
+        Lampa.Listener.follow('card', function(card){
+            addFilmHubButton(card);
+        });
+    }
 
     if(Lampa.Noty) Lampa.Noty.show(`FilmHub+ ${VERSION} завантажено`);
 }
