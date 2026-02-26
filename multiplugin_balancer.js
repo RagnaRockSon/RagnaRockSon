@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.5.2';
+const VERSION = 'v4.5.6';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -16,9 +16,9 @@ var tempState = {};
 var hasChanges = false;
 var outsideHandler = null;
 
+// === CSS ===
 function injectCSS() {
     if (document.getElementById('multi-style')) return;
-
     var style = document.createElement('style');
     style.id = 'multi-style';
     style.innerHTML = `
@@ -32,7 +32,7 @@ function injectCSS() {
         .multi-toggle.disabled { background:#d24a4a; }
         .multi-btn-edit { background:#FF9800; }
         .multi-btn-delete { background:#d24a4a; }
-        .multi-btn-add { background:#156DD1; padding:10px 0; margin-top:10px; border-radius:8px; text-align:center; font-weight:bold; }
+        .multi-btn-add { background:#156DD1; padding:10px 0; margin-top:10px; border-radius:8px; text-align:center; font-weight:bold; cursor:pointer; }
         .multi-apply { text-align:center; margin-top:12px; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
         .modal-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:10px; border-radius:5px; margin-bottom:10px; width:100%; box-sizing:border-box; }
         .modal-input::placeholder { color:rgba(255,255,255,0.5); }
@@ -40,6 +40,7 @@ function injectCSS() {
     document.head.appendChild(style);
 }
 
+// === Загальні функції ===
 function updateTitle(modalTitle) {
     if (!modalTitle) return;
     var title = hasChanges
@@ -85,6 +86,7 @@ function saveSourcestoStorage() {
     Lampa.Storage.set('multi_sources', JSON.stringify(sources));
 }
 
+// === Підмодалки ===
 function openEditModal(index, callback) {
     var src = sources[index];
     var formHtml = $(`
@@ -98,43 +100,34 @@ function openEditModal(index, callback) {
                 <input type="text" class="modal-input edit-url" value="${src.url}" placeholder="Введіть URL">
             </div>
             <div style="display:flex; gap:10px;">
-                <div class="selector" style="flex:1; padding:10px; background:#156DD1; text-align:center; border-radius:5px; cursor:pointer;">Зберегти</div>
-                <div class="selector" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
+                <div class="selector save" style="flex:1; padding:10px; background:#156DD1; text-align:center; border-radius:5px; cursor:pointer;">Зберегти</div>
+                <div class="selector cancel" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
             </div>
         </div>
     `);
 
-    var saveBtn = formHtml.find('div').eq(2).find('.selector').first();
-    var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
-
-    saveBtn.on('hover:enter', function () {
+    formHtml.find('.save').on('hover:enter', function () {
         var newName = formHtml.find('.edit-name').val().trim();
         var newUrl = formHtml.find('.edit-url').val().trim();
-
-        if (!newName || !newUrl) {
-            if (Lampa.Noty) Lampa.Noty.show('Заповніть всі поля');
-            return;
-        }
+        if (!newName || !newUrl) { if(Lampa.Noty) Lampa.Noty.show('Заповніть всі поля'); return; }
 
         sources[index] = { name: newName, url: newUrl };
         saveSourcestoStorage();
         hasChanges = true;
         Lampa.Modal.close();
-        if (callback) callback();
+        if (callback) callback(); // Повертаємось до головної модалки
     });
 
-    cancelBtn.on('hover:enter', function () {
+    formHtml.find('.cancel').on('hover:enter', function () {
         Lampa.Modal.close();
+        if (callback) callback();
     });
 
     Lampa.Modal.open({
         title: 'Редагування джерела',
         html: formHtml,
         size: 'medium',
-        onBack: function () {
-            Lampa.Modal.close();
-            return true;
-        }
+        onBack: function () { Lampa.Modal.close(); if(callback) callback(); return true; }
     });
 }
 
@@ -150,23 +143,16 @@ function openAddModal(callback) {
                 <input type="text" class="modal-input add-url" placeholder="Введіть URL до скрипту">
             </div>
             <div style="display:flex; gap:10px;">
-                <div class="selector" style="flex:1; padding:10px; background:#46b85a; text-align:center; border-radius:5px; cursor:pointer;">Додати</div>
-                <div class="selector" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
+                <div class="selector save" style="flex:1; padding:10px; background:#46b85a; text-align:center; border-radius:5px; cursor:pointer;">Додати</div>
+                <div class="selector cancel" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
             </div>
         </div>
     `);
 
-    var addBtn = formHtml.find('div').eq(2).find('.selector').first();
-    var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
-
-    addBtn.on('hover:enter', function () {
+    formHtml.find('.save').on('hover:enter', function () {
         var newName = formHtml.find('.add-name').val().trim();
         var newUrl = formHtml.find('.add-url').val().trim();
-
-        if (!newName || !newUrl) {
-            if (Lampa.Noty) Lampa.Noty.show('Заповніть всі поля');
-            return;
-        }
+        if (!newName || !newUrl) { if(Lampa.Noty) Lampa.Noty.show('Заповніть всі поля'); return; }
 
         sources.push({ name: newName, url: newUrl });
         saveSourcestoStorage();
@@ -175,21 +161,20 @@ function openAddModal(callback) {
         if (callback) callback();
     });
 
-    cancelBtn.on('hover:enter', function () {
+    formHtml.find('.cancel').on('hover:enter', function () {
         Lampa.Modal.close();
+        if (callback) callback();
     });
 
     Lampa.Modal.open({
         title: 'Додавання нового джерела',
         html: formHtml,
         size: 'medium',
-        onBack: function () {
-            Lampa.Modal.close();
-            return true;
-        }
+        onBack: function () { Lampa.Modal.close(); if(callback) callback(); return true; }
     });
 }
 
+// === Головна модалка ===
 function openSourcesModal() {
     tempState = {};
     hasChanges = false;
@@ -217,7 +202,7 @@ function openSourcesModal() {
                 </div>
             `);
 
-            // Увімкнення/вимкнення
+            // Toggle
             item.find('.multi-toggle').on('hover:enter', function () {
                 var key = $(this).data('key');
                 tempState[key] = !tempState[key];
@@ -230,12 +215,12 @@ function openSourcesModal() {
                 updateTitle($('.modal__title'));
             });
 
-            // Редагування
+            // Edit
             item.find('.multi-btn-edit').on('hover:enter', function () {
                 openEditModal($(this).data('index'), renderSources);
             });
 
-            // Видалення
+            // Delete
             item.find('.multi-btn-delete').on('hover:enter', function () {
                 var idx = $(this).data('index');
                 sources.splice(idx, 1);
@@ -254,19 +239,12 @@ function openSourcesModal() {
 
     renderSources();
 
-    addBtn.on('hover:enter', function () {
-        openAddModal(renderSources);
-    });
+    addBtn.on('hover:enter', function () { openAddModal(renderSources); });
 
     applyBtn.on('hover:enter', function () {
         if (!hasChanges) return;
-
-        Object.keys(tempState).forEach(function (k) {
-            Lampa.Storage.set(k, tempState[k]);
-        });
-
+        Object.keys(tempState).forEach(function (k) { Lampa.Storage.set(k, tempState[k]); });
         disableOutsideClose();
-
         if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
             Lampa.Manifest.app_reload();
         } else {
@@ -278,10 +256,7 @@ function openSourcesModal() {
         title: `Мій мультиплагін ${VERSION} — Балансери`,
         html: container,
         size: 'medium',
-        onBack: function () {
-            closeModal({ onClose: function () { Lampa.Controller.toggle('settings_component'); } });
-            return true;
-        }
+        onBack: function () { closeModal({ onClose: function () { Lampa.Controller.toggle('settings_component'); } }); return true; }
     });
 
     setTimeout(function () {
@@ -292,12 +267,12 @@ function openSourcesModal() {
     }, 200);
 }
 
+// === Активні джерела ===
 function loadActiveSources() {
     sources.forEach(function (src) {
         var enabled = Lampa.Storage.get('multi_' + src.name, false);
         if (!enabled) return;
         if (document.querySelector('script[src="' + src.url + '"]')) return;
-
         var script = document.createElement('script');
         script.src = src.url;
         script.async = false;
@@ -305,6 +280,7 @@ function loadActiveSources() {
     });
 }
 
+// === Ініціалізація ===
 function initSettings() {
     var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
     if (!SettingsApi || !SettingsApi.addComponent) return;
@@ -323,6 +299,7 @@ function initSettings() {
     });
 }
 
+// === Старт ===
 function start() {
     injectCSS();
     loadSourcesFromStorage();
@@ -337,11 +314,7 @@ function start() {
 }
 
 if (Lampa.Listener) {
-    Lampa.Listener.follow('app', function (e) {
-        if (e && e.type === 'ready') start();
-    });
-} else {
-    start();
-}
+    Lampa.Listener.follow('app', function (e) { if (e && e.type === 'ready') start(); });
+} else { start(); }
 
 })();
