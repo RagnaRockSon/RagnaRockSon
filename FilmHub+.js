@@ -1,62 +1,51 @@
 (function() {
     'use strict';
 
-    if (window.MyPluginLoaded) return;
-    window.MyPluginLoaded = true;
+    const PLUGIN_NAME = 'FilmHub+';
+    const PLUGIN_VERSION = 'v0.1-dev';
 
-    const PLUGIN_VERSION = '0.1-dev';
-    const BUTTON_TITLE = '🎬 FilmHub+';
+    // Показати сповіщення при старті Лампи
+    Lampa.Noty.show(`Завантажено плагін ${PLUGIN_NAME} ${PLUGIN_VERSION}`, {time: 4000});
 
-    // Показ сповіщення про версію плагіна при старті Лампи
-    Lampa.Noty.show(`MyPlugin v${PLUGIN_VERSION} завантажено`, {time: 3000});
+    function addPluginButton(cardActivity) {
+        if (!cardActivity) return;
 
-    // Функція додавання кнопки
-    function addPluginButton(cardActivity, movie) {
-        if (!cardActivity || cardActivity.find('.myplugin-button').length) return;
+        // Шукаємо контейнер кнопок джерел
+        const sourceBtnContainer = cardActivity.find('.view--sources');
+        if (!sourceBtnContainer.length) return;
 
-        // Створюємо кнопку
-        const btn = $('<div class="myplugin-button focus">' + BUTTON_TITLE + '</div>');
-        btn.css({
-            display: 'inline-block',
-            marginRight: '0.5em',
-            padding: '0.5em 1em',
-            background: '#ff3d00',
-            color: '#fff',
-            borderRadius: '0.3em',
-            cursor: 'pointer',
-            fontWeight: 'bold'
-        });
+        // Перевірка, чи кнопка вже додана
+        if (sourceBtnContainer.find('.filmhub-btn').length) return;
 
+        // Створюємо нашу кнопку
+        const btn = $('<div class="filmhub-btn" style="margin-right:0.5em; padding:0.4em 0.8em; background:#FF4500; color:white; border-radius:0.3em; cursor:pointer;">🎬 FilmHub+</div>');
+
+        // Клік на кнопку
         btn.on('hover:enter', function() {
-            // Тут можна підключити компонент або функціонал плагіна
-            Lampa.Noty.show('Запущено MyPlugin', {time: 2000});
-            console.log('MyPlugin запущено для', movie.title || movie.name);
+            Lampa.Noty.show('Запуск FilmHub+...', {time: 3000});
+            // Тут виклик твого компоненту або функції плагіна
+            console.log('Тут має бути твій компонент');
         });
 
-        // Знаходимо контейнер джерел, універсально
-        let container = cardActivity.find('[class*="view--"]').first();
-        if (!container.length) {
-            // якщо не знайшли стандартний блок
-            container = cardActivity;
-        }
-
-        // Вставляємо кнопку зліва від всіх елементів
-        container.prepend(btn);
+        // Додаємо кнопку всередину контейнера джерел (першою зліва)
+        sourceBtnContainer.prepend(btn);
     }
 
-    // Слідкуємо за завантаженням карточки фільму
+    // Слідкуємо за рендером карточки фільму
     Lampa.Listener.follow('full', function(e) {
         if (e.type === 'complite') {
-            addPluginButton(e.object.activity.render(), e.data.movie);
+            addPluginButton(e.object.activity.render());
         }
     });
 
-    // Якщо вже відкрита карточка
+    // Додатково перевіряємо активну карточку при старті
     try {
-        const active = Lampa.Activity.active();
-        if (active && active.component === 'full') {
-            addPluginButton(active.activity.render(), active.card);
+        const activeActivity = Lampa.Activity.active();
+        if (activeActivity.component === 'full') {
+            addPluginButton(activeActivity.activity.render());
         }
-    } catch(e) {}
+    } catch (err) {
+        console.error('FilmHub+ error:', err);
+    }
 
 })();
