@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.2';
+    const VERSION = 'v4.2.1';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -42,11 +42,11 @@
         $('.modal__title').text(title);
     }
 
-    function enableOutsideClose(container) {
+    function enableOutsideClose(container, onClose) {
         setTimeout(function () {
             outsideHandler = function (e) {
                 if (!$(e.target).closest(container).length) {
-                    closeModal();
+                    closeModal(onClose);
                 }
             };
             $('.modal').on('mousedown.multi', outsideHandler);
@@ -58,9 +58,36 @@
         outsideHandler = null;
     }
 
-    function closeModal() {
+    function closeModal(onClose) {
         disableOutsideClose();
         Lampa.Modal.close();
+        if (typeof onClose === 'function') onClose();
+    }
+
+    function openEditModal(src, isNew, callback) {
+        var title = isNew ? 'Додати джерело' : 'Редагувати джерело';
+        var form = $(`
+            <div style="display:flex; flex-direction:column; gap:10px;">
+                <input type="text" placeholder="Назва" value="${src.name}" class="multi-input" style="padding:8px; border-radius:6px; width:100%;">
+                <input type="text" placeholder="Посилання" value="${src.url}" class="multi-input" style="padding:8px; border-radius:6px; width:100%;">
+                <div class="multi-apply selector">Зберегти</div>
+            </div>
+        `);
+
+        form.find('.multi-apply').on('hover:enter', function () {
+            var name = form.find('input').eq(0).val().trim();
+            var url = form.find('input').eq(1).val().trim();
+            if (!name || !url) return;
+            callback({ name, url });
+            Lampa.Modal.close();
+        });
+
+        Lampa.Modal.open({
+            title: title,
+            html: form,
+            size: 'medium',
+            onBack: function () { return true; }
+        });
     }
 
     function renderSources(container) {
@@ -80,7 +107,6 @@
                 </div>
             `);
 
-            // Перемикання увімкнено/вимкнено
             item.find('.multi-toggle').on('hover:enter', function () {
                 tempState[key] = !current;
                 current = tempState[key];
@@ -90,9 +116,8 @@
                 updateTitle();
             });
 
-            // Редагувати назву/посилання
             item.find('.multi-edit').on('hover:enter', function () {
-                openEditModal(src, function (newData) {
+                openEditModal(src, false, function (newData) {
                     src.name = newData.name;
                     src.url = newData.url;
                     renderSources(container);
@@ -102,10 +127,9 @@
             container.append(item);
         });
 
-        // Додати нове джерело
-        var addBtn = $('<div class="multi-add selector">Додати нове джерело</div>');
+        var addBtn = $('<div class="multi-add selector">Додати джерело</div>');
         addBtn.on('hover:enter', function () {
-            openEditModal({ name: '', url: '' }, function (newData) {
+            openEditModal({ name: '', url: '' }, true, function (newData) {
                 sources.push({ name: newData.name, url: newData.url });
                 renderSources(container);
             });
@@ -113,7 +137,6 @@
 
         container.append(addBtn);
 
-        // Кнопка застосувати зміни
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
         applyBtn.on('hover:enter', function () {
             Object.keys(tempState).forEach(function (k) {
@@ -126,39 +149,12 @@
                 location.reload();
             }
         });
-
         container.append(applyBtn);
-    }
-
-    function openEditModal(src, callback) {
-        var form = $(`
-            <div style="display:flex; flex-direction:column; gap:10px;">
-                <input type="text" placeholder="Назва" value="${src.name}" class="multi-input" style="padding:8px; border-radius:6px; width:100%;">
-                <input type="text" placeholder="Посилання" value="${src.url}" class="multi-input" style="padding:8px; border-radius:6px; width:100%;">
-                <div class="multi-apply selector">Зберегти</div>
-            </div>
-        `);
-
-        form.find('.multi-apply').on('hover:enter', function () {
-            var name = form.find('input').eq(0).val().trim();
-            var url = form.find('input').eq(1).val().trim();
-            if (!name || !url) return;
-            callback({ name, url });
-            Lampa.Modal.close();
-        });
-
-        Lampa.Modal.open({
-            title: 'Редагувати джерело',
-            html: form,
-            size: 'medium',
-            onBack: function () { return true; }
-        });
     }
 
     function openSourcesModal() {
         tempState = {};
         hasChanges = false;
-
         var container = $('<div class="multi-container"></div>');
 
         renderSources(container);
@@ -168,7 +164,7 @@
             html: container,
             size: 'medium',
             onBack: function () {
-                closeModal();
+                closeModal(function () { Lampa.Controller.toggle('settings_component'); });
                 return true;
             }
         });
@@ -176,7 +172,7 @@
         setTimeout(function () {
             Lampa.Controller.collectionSet(container);
             Lampa.Controller.collectionFocus(container.find('.selector').first());
-            enableOutsideClose(container);
+            enableOutsideClose(container, function () { Lampa.Controller.toggle('settings_component'); });
             updateTitle();
         }, 200);
     }
