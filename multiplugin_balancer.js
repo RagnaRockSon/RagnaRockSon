@@ -254,9 +254,6 @@ function openSourcesModal(){
         }
     });
 
-    if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
-}
-
 // ================= INIT =================
 function loadActive(){
     sources.forEach(function(src){
@@ -291,6 +288,9 @@ function start(){
     loadSources();
     loadActive();
     init();
+}
+
+if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
 }
 
 if(Lampa.Listener){
