@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.5.2';
+const VERSION = 'v4.5.3';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -24,7 +24,6 @@ function injectCSS() {
     style.innerHTML = `
         .multi-container { padding:15px; transition: all 0.3s ease; }
         .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:8px; transition: all 0.3s ease; }
-        .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
         .multi-left { width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; line-height:18px; }
         .multi-right { width:60%; display:flex; justify-content:space-between; gap:5px; }
         .multi-btn { flex:1; text-align:center; padding:8px 0; border-radius:6px; font-size:13px; cursor:pointer; color:#fff; transition: all 0.3s ease; }
@@ -70,22 +69,10 @@ function closeModal(modal) {
     Lampa.Modal.close();
 }
 
-function loadSourcesFromStorage() {
-    var saved = Lampa.Storage.get('multi_sources', null);
-    if (saved) {
-        try {
-            sources = JSON.parse(saved);
-        } catch (e) {
-            console.error('[MultiPlugin] Error loading sources:', e);
-        }
-    }
-}
-
-function saveSourcestoStorage() {
-    Lampa.Storage.set('multi_sources', JSON.stringify(sources));
-}
-
-function openEditModal(index, callback) {
+// ------------------
+// Внутрішні модалки редагування/додавання
+// ------------------
+function openEditModal(index, callback, parentOutsideHandler) {
     var src = sources[index];
     var formHtml = $(`
         <div style="padding:20px;">
@@ -117,7 +104,7 @@ function openEditModal(index, callback) {
         }
 
         sources[index] = { name: newName, url: newUrl };
-        saveSourcestoStorage();
+        Lampa.Storage.set('multi_sources', JSON.stringify(sources));
         hasChanges = true;
         Lampa.Modal.close();
         if (callback) callback();
@@ -134,11 +121,15 @@ function openEditModal(index, callback) {
         onBack: function () {
             Lampa.Modal.close();
             return true;
+        },
+        onClose: function () {
+            // Відновлюємо зовнішній обробник головної модалки
+            if (parentOutsideHandler) $('.modal').on('mousedown.multi', parentOutsideHandler);
         }
     });
 }
 
-function openAddModal(callback) {
+function openAddModal(callback, parentOutsideHandler) {
     var formHtml = $(`
         <div style="padding:20px;">
             <div style="margin-bottom:15px;">
@@ -169,7 +160,7 @@ function openAddModal(callback) {
         }
 
         sources.push({ name: newName, url: newUrl });
-        saveSourcestoStorage();
+        Lampa.Storage.set('multi_sources', JSON.stringify(sources));
         hasChanges = true;
         Lampa.Modal.close();
         if (callback) callback();
@@ -186,10 +177,16 @@ function openAddModal(callback) {
         onBack: function () {
             Lampa.Modal.close();
             return true;
+        },
+        onClose: function () {
+            if (parentOutsideHandler) $('.modal').on('mousedown.multi', parentOutsideHandler);
         }
     });
 }
 
+// ------------------
+// Головна модалка балансерів
+// ------------------
 function openSourcesModal() {
     tempState = {};
     hasChanges = false;
@@ -232,14 +229,14 @@ function openSourcesModal() {
 
             // Редагування
             item.find('.multi-btn-edit').on('hover:enter', function () {
-                openEditModal($(this).data('index'), renderSources);
+                openEditModal($(this).data('index'), renderSources, outsideHandler);
             });
 
             // Видалення
             item.find('.multi-btn-delete').on('hover:enter', function () {
                 var idx = $(this).data('index');
                 sources.splice(idx, 1);
-                saveSourcestoStorage();
+                Lampa.Storage.set('multi_sources', JSON.stringify(sources));
                 hasChanges = true;
                 renderSources();
                 updateTitle($('.modal__title'));
@@ -255,7 +252,7 @@ function openSourcesModal() {
     renderSources();
 
     addBtn.on('hover:enter', function () {
-        openAddModal(renderSources);
+        openAddModal(renderSources, outsideHandler);
     });
 
     applyBtn.on('hover:enter', function () {
@@ -291,6 +288,8 @@ function openSourcesModal() {
         updateTitle($('.modal__title'));
     }, 200);
 }
+
+// ------------------
 
 function loadActiveSources() {
     sources.forEach(function (src) {
