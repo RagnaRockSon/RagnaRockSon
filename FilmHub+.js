@@ -1,35 +1,34 @@
 (function() {
     'use strict';
 
-    const PLUGIN_NAME = 'FilmHub+';
-    const PLUGIN_VERSION = 'dev-0.1';
+    const PLUGIN_NAME = 'FilmHubPlus';
+    const PLUGIN_VERSION = '0.1-dev';
 
-    function addFilmHubButton(e) {
-        if (e.render.find('.filmhub-button').length) return;
+    // Сповіщення про завантаження плагіна при старті Лампи
+    Lampa.Noty.show(`🔥 ${PLUGIN_NAME} v${PLUGIN_VERSION} завантажується`, {time: 3000});
 
-        var btnHtml = `
-            <div class="lampac--button filmhub-button">
-                <span class="icon">🎬</span>
-                <span class="title">${PLUGIN_NAME} (${PLUGIN_VERSION})</span>
-            </div>
-        `;
-        var btn = $(btnHtml);
+    function addButton(e) {
+        if (e.render.find('.filmhubplus--button').length) return;
 
+        // Створюємо кнопку
+        const btn = $('<div class="filmhubplus--button lampac--button">🎬 FilmHub+</div>');
+
+        // Клік по кнопці
         btn.on('hover:enter', function() {
+            // Скидання старих шаблонів
             resetTemplates();
 
-            // показуємо сповіщення про завантаження
-            Lampa.Noty.show(`Завантаження ${PLUGIN_NAME}...`, {time: 2000});
+            // Додаємо компонент нашого плагіна
+            Lampa.Component.add(PLUGIN_NAME, component);
 
-            Lampa.Component.add('FilmHubPlus', component);
-
-            var id = Lampa.Utils.hash(e.movie.number_of_seasons ? e.movie.original_name : e.movie.original_title);
-            var all = Lampa.Storage.get('clarification_search', '{}');
+            // Підготовка пошуку для фільму
+            const id = Lampa.Utils.hash(e.movie.number_of_seasons ? e.movie.original_name : e.movie.original_title);
+            const all = Lampa.Storage.get('clarification_search','{}');
 
             Lampa.Activity.push({
                 url: '',
-                title: PLUGIN_NAME,
-                component: 'FilmHubPlus',
+                title: Lampa.Lang.translate('title_online'),
+                component: PLUGIN_NAME,
                 search: all[id] ? all[id] : e.movie.title,
                 search_one: e.movie.title,
                 search_two: e.movie.original_title,
@@ -39,32 +38,33 @@
             });
         });
 
-        e.render.prepend(btn);
+        // Додаємо кнопку ліворуч від блоку джерел
+        e.render.before(btn);
     }
 
-    // відслідковуємо рендер картки
+    // Слідкуємо за відкриттям повної картки фільму
     Lampa.Listener.follow('full', function(e) {
         if (e.type === 'complite') {
-            addFilmHubButton({
+            addButton({
                 render: e.object.activity.render().find('.view--torrent'),
                 movie: e.data.movie
             });
         }
     });
 
-    // якщо активна картка вже відкрита
+    // Якщо вже відкрита активна картка
     try {
         if (Lampa.Activity.active().component === 'full') {
-            addFilmHubButton({
+            addButton({
                 render: Lampa.Activity.active().activity.render().find('.view--torrent'),
                 movie: Lampa.Activity.active().card
             });
         }
-    } catch (err) {
-        console.error(`${PLUGIN_NAME} init error:`, err);
-    }
+    } catch (err) {}
 
-    // показуємо коротке повідомлення про версію при старті
-    Lampa.Noty.show(`${PLUGIN_NAME} [${PLUGIN_VERSION}] завантажено`, {time: 1500});
+    // Версія для розробки
+    if (!window.FilmHubPlus_plugin) {
+        window.FilmHubPlus_plugin = true;
+    }
 
 })();
