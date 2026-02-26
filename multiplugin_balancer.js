@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.6.2';
+const VERSION = 'v4.6.2.1';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -16,8 +16,7 @@ var tempState = {};
 var hasChanges = false;
 var viewMode = 'list'; // list | add | edit
 var editIndex = null;
-var wrapper = null;
-var outsideHandler = null;
+var wrapper;
 
 /* ================= CSS ================= */
 
@@ -55,30 +54,6 @@ function loadSources() {
 
 function saveSources() {
     Lampa.Storage.set('multi_sources', JSON.stringify(sources));
-}
-
-/* ================= MODAL HANDLER ================= */
-
-function enableOutsideClose(container, modal) {
-    setTimeout(() => {
-        outsideHandler = function(e){
-            if(!$(e.target).closest(container).length && !$(e.target).closest('.modal').length){
-                closeModal(modal);
-            }
-        };
-        $('.modal').on('mousedown.multi', outsideHandler);
-    }, 200);
-}
-
-function disableOutsideClose() {
-    $('.modal').off('mousedown.multi');
-    outsideHandler = null;
-}
-
-function closeModal(modal) {
-    disableOutsideClose();
-    if(modal && modal.onClose) modal.onClose();
-    Lampa.Modal.close();
 }
 
 /* ================= VIEW RENDER ================= */
@@ -127,10 +102,10 @@ function renderList() {
             renderEdit();
         });
 
-        // delete with confirmation
+        // delete з підтвердженням
         item.find('.delete').on('hover:enter', function(){
             var idx = $(this).data('index');
-            openDeleteConfirm(idx);
+            openConfirmDelete(idx);
         });
 
         container.append(item);
@@ -155,7 +130,6 @@ function renderList() {
     setTimeout(function(){
         Lampa.Controller.collectionSet(wrapper);
         Lampa.Controller.collectionFocus(wrapper.find('.selector').first());
-        enableOutsideClose(wrapper, { onClose: function(){ Lampa.Controller.toggle('settings_component'); } });
     },100);
 }
 
@@ -225,44 +199,50 @@ function renderEdit(){
     },100);
 }
 
-/* ================= DELETE CONFIRM ================= */
+/* ================= ПІДТВЕРДЖЕННЯ ВИДАЛЕННЯ ================= */
 
-function openDeleteConfirm(index){
-    var html = $(`
-        <div style="padding:20px; display:flex; flex-direction:column; gap:10px;">
-            <div>Видалити джерело?</div>
+function openConfirmDelete(index){
+    var confirmHtml = $(`
+        <div style="padding:20px;">
+            <div style="margin-bottom:15px;">Ви дійсно хочете видалити джерело?</div>
             <div style="display:flex; gap:10px;">
-                <div class="selector" style="flex:1; padding:10px; background:#d24a4a; text-align:center; border-radius:5px;">Підтвердити</div>
-                <div class="selector" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px;">Скасувати</div>
+                <div class="selector" style="flex:1; padding:10px; background:#d24a4a; text-align:center; border-radius:5px; cursor:pointer;">Підтвердити</div>
+                <div class="selector" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
             </div>
         </div>
     `);
 
-    var confirmBtn = html.find('div.selector').first();
-    var cancelBtn = html.find('div.selector').last();
+    var confirmBtn = confirmHtml.find('div').eq(1).find('.selector').first();
+    var cancelBtn = confirmHtml.find('div').eq(1).find('.selector').last();
 
-    confirmBtn.on('hover:enter', function(){
+    confirmBtn.on('hover:enter',function(){
         sources.splice(index,1);
         saveSources();
         Lampa.Modal.close();
-        renderList();
+        renderList(); // повертаємо фокус у головний модал
     });
 
-    cancelBtn.on('hover:enter', function(){
+    cancelBtn.on('hover:enter',function(){
         Lampa.Modal.close();
+        renderList(); // повертаємо фокус у головний модал
     });
 
     Lampa.Modal.open({
-        title: 'Підтвердження видалення',
-        html: html,
-        size: 'small',
-        onBack: function(){ Lampa.Modal.close(); return true; }
+        title:'Підтвердження видалення',
+        html:confirmHtml,
+        size:'small',
+        onBack:function(){
+            Lampa.Modal.close();
+            renderList();
+            return true;
+        }
     });
 }
 
 /* ================= MAIN MODAL ================= */
 
 function openSourcesModal(){
+
     wrapper = $('<div></div>');
     renderList();
 
@@ -275,7 +255,8 @@ function openSourcesModal(){
                 renderList();
                 return true;
             }
-            closeModal({ onClose: function(){ Lampa.Controller.toggle('settings_component'); } });
+            Lampa.Modal.close();
+            Lampa.Controller.toggle('settings_component');
             return true;
         }
     });
@@ -311,13 +292,12 @@ function init(){
     });
 }
 
-/* ================= START ================= */
-
 function start(){
     injectCSS();
     loadSources();
     loadActive();
     init();
+
     if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
     console.log(`[MultiPlugin ${VERSION}] Loaded`);
 }
