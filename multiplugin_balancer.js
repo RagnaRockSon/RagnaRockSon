@@ -10,8 +10,6 @@
         { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
     ];
 
-    var prevBackHandler = null;
-
     // ==============================
     // CSS
     // ==============================
@@ -51,7 +49,7 @@
     }
 
     // ==============================
-    // Модаль керування
+    // Модал керування
     // ==============================
     function openSourcesModal() {
         var changes = false;
@@ -60,22 +58,8 @@
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
         // ==============================
-        // Зберігаємо попередній BACK handler
+        // Додати джерела
         // ==============================
-        prevBackHandler = Lampa.Controller.back;
-        Lampa.Controller.back = function () {
-            closeModal();
-        };
-
-        // Закриття при кліку поза контейнером
-        setTimeout(function () {
-            $(document).on('click.multiPluginOutside', function(e) {
-                if (!$(e.target).closest('.multi-container').length) {
-                    closeModal();
-                }
-            });
-        }, 100);
-
         sources.forEach(function (src) {
             var storageKey = 'multi_' + src.name;
             var enabled = Lampa.Storage.get(storageKey, false);
@@ -108,13 +92,14 @@
         // ==============================
         // Кнопка застосувати зміни
         // ==============================
-        applyButton.on('hover:enter', function () {
-            if (changes && Lampa.Modal && Lampa.Modal.confirm) {
+        applyButton.on('hover:enter', function (e) {
+            e.stopPropagation(); // Важливо! Блокуємо сплив події, щоб клік поза контейнером не закрив модаль
+
+            if (Lampa.Modal && Lampa.Modal.confirm) {
                 Lampa.Modal.confirm({
                     title: 'Перезапуск потрібен',
                     text: 'Щоб застосувати зміни, Lampa потрібно перезавантажити. Перезавантажити зараз?',
                     yes: function () {
-                        closeModal();
                         if (Lampa.Manifest.app_reload) {
                             Lampa.Manifest.app_reload();
                         } else {
@@ -122,38 +107,63 @@
                         }
                     }
                 });
+            } else {
+                location.reload();
             }
         });
 
         // ==============================
         // Кнопка Назад
         // ==============================
-        backButton.on('hover:enter', function () {
-            closeModal();
+        backButton.on('hover:enter', function (e) {
+            e.stopPropagation();
+            Lampa.Modal.close();
+            $(document).off('click.multiPluginOutside');
         });
 
         container.append(applyButton).append(backButton);
 
+        // ==============================
+        // Закриття при кліку поза контейнером
+        // ==============================
+        setTimeout(function () {
+            $(document).on('click.multiPluginOutside', function(e) {
+                if (!$(e.target).closest('.multi-container, .multi-apply, .multi-back').length) {
+                    Lampa.Modal.close();
+                    $(document).off('click.multiPluginOutside');
+                }
+            });
+        }, 100);
+
+        // ==============================
+        // Відкриття модалі
+        // ==============================
         Lampa.Modal.open({
             title: 'Мультиплагін v1.1 — Балансери',
             html: container
         });
 
+        // ==============================
+        // Навігація
+        // ==============================
         Lampa.Controller.collectionSet(container);
         Lampa.Controller.collectionFocus(container.find('.selector').first());
 
         // ==============================
-        // Закриття модалі
+        // BACK на пульті
         // ==============================
-        function closeModal() {
-            Lampa.Modal.close();
-            $(document).off('click.multiPluginOutside');
-
-            // Відновлюємо BACK handler для меню плагіна
-            if (prevBackHandler) {
-                Lampa.Controller.back = prevBackHandler;
-                prevBackHandler = null;
-            }
+        if (Lampa.Controller && Lampa.Controller.add) {
+            Lampa.Controller.add('back', function () {
+                if (Lampa.Modal && Lampa.Modal.isOpen && Lampa.Modal.isOpen()) {
+                    Lampa.Modal.close();
+                    $(document).off('click.multiPluginOutside');
+                } else {
+                    // Вихід в основне меню налаштувань
+                    if (Lampa.Settings && Lampa.Settings.back) {
+                        Lampa.Settings.back();
+                    }
+                }
+            });
         }
     }
 
@@ -166,7 +176,7 @@
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
-            name: 'Мультиплагін v1.1',
+            name: 'Мій мультиплагін v1.1',
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
