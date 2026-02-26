@@ -4,8 +4,8 @@
 if(!window.Lampa) return;
 
 const VERSION = 'v1.0.0';
-
-var sources = [
+var wrapper;
+var pluginsSources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
     { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
     { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
@@ -14,37 +14,43 @@ var sources = [
 
 // ================= CSS =================
 function injectCSS(){
-    if(document.getElementById('multi-style')) return;
+    if(document.getElementById('filmhub-style')) return;
     var style = document.createElement('style');
-    style.id = 'multi-style';
+    style.id='filmhub-style';
     style.innerHTML = `
-        .multi-container{padding:15px;}
-        .multi-item{padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.05);border-radius:6px;display:flex;justify-content:space-between;align-items:center;}
-        .multi-btn{padding:8px 10px;border-radius:6px;background:#156DD1;color:#fff;text-align:center;cursor:pointer;}
-        .multi-btn:hover{background:#0f4d91;}
-        .modal-title{font-size:16px;margin-bottom:10px;color:#fff;}
+        .filmhub-container{padding:15px;}
+        .filmhub-item{padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.05);border-radius:8px;cursor:pointer;color:#fff;}
+        .filmhub-title{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
     `;
     document.head.appendChild(style);
 }
 
-// ================= ВІДКРИТТЯ МЕНЮ =================
-function openBalancerModal(contentTitle, items, onSelect){
-    var wrapper = $('<div class="multi-container"></div>');
+// ================= LOAD PLUGINS =================
+function loadPluginSources(){
+    pluginsSources.forEach(src=>{
+        if(document.querySelector('script[src="'+src.url+'"]')) return;
+        var s = document.createElement('script');
+        s.src = src.url;
+        s.async = false;
+        document.body.appendChild(s);
+    });
+}
 
-    items.forEach(function(item,index){
-        var row = $(`<div class="multi-item selector">${item.name}</div>`);
-        row.on('hover:enter',function(){
-            if(onSelect) onSelect(item);
+// ================= RENDER =================
+function renderFilmHub(){
+    wrapper.empty();
+    var container = $('<div class="filmhub-container"></div>');
+
+    pluginsSources.forEach(src=>{
+        var item = $(`<div class="filmhub-item selector"><div class="filmhub-title">${src.name}</div></div>`);
+        item.on('hover:enter', function(){
+            // тут можна підключати логіку підвантаження фільмів/серій із цього джерела
+            if(Lampa.Noty) Lampa.Noty.show(`Вибрано джерело: ${src.name}`);
         });
-        wrapper.append(row);
+        container.append(item);
     });
 
-    Lampa.Modal.open({
-        title: contentTitle,
-        html: wrapper,
-        size:'medium',
-        onBack: function(){ Lampa.Modal.close(); return true; }
-    });
+    wrapper.append(container);
 
     setTimeout(function(){
         Lampa.Controller.collectionSet(wrapper);
@@ -52,46 +58,19 @@ function openBalancerModal(contentTitle, items, onSelect){
     },100);
 }
 
-// ================= ПІДКЛЮЧЕННЯ ДЖЕРЕЛ =================
-function loadActiveSources(callback){
-    var loaded = 0;
-    if(!sources.length){ if(callback) callback(); return; }
+// ================= MAIN MODAL =================
+function openFilmHubModal(){
+    wrapper = $('<div></div>');
+    renderFilmHub();
 
-    sources.forEach(function(src){
-        if(document.querySelector('script[src="'+src.url+'"]')){ loaded++; if(loaded===sources.length && callback) callback(); return; }
-        var s=document.createElement('script');
-        s.src=src.url;
-        s.async=false;
-        s.onload=function(){ loaded++; if(loaded===sources.length && callback) callback(); };
-        document.body.appendChild(s);
-    });
-}
-
-// ================= ДОБАВЛЕННЯ КНОПКИ В КАРТІ ФІЛЬМУ =================
-function addMyBalancerButton(){
-    if(!Lampa.Player) return;
-
-    Lampa.Player.addButton({
-        name: 'Мій балансер',
-        icon: '🎬',
-        onClick: function(content){
-            // content — дані про фільм/серіал, які передає Player
-            // отримуємо список джерел із інших плагінів
-            loadActiveSources(function(){
-                var availableSources = sources.map(s=>({ name: s.name, url: s.url }));
-                openBalancerModal('Мій балансер', availableSources, function(selectedSource){
-                    // Тут ми підключаємо обране джерело для перегляду фільму
-                    // Наприклад, викликаємо функцію з цього плагіна, передаємо content.id або content.url
-                    if(selectedSource && selectedSource.url){
-                        if(window.Lampa && Lampa.Player && Lampa.Player.openExternalSource){
-                            Lampa.Player.openExternalSource(selectedSource.url, content);
-                        } else {
-                            console.log('Вибрано джерело:', selectedSource.name, 'для контенту:', content.title);
-                        }
-                        Lampa.Modal.close();
-                    }
-                });
-            });
+    Lampa.Modal.open({
+        title:`FilmHub+ ${VERSION}`,
+        html:wrapper,
+        size:'medium',
+        onBack:function(){
+            Lampa.Modal.close();
+            Lampa.Controller.toggle('settings_component');
+            return true;
         }
     });
 }
@@ -99,15 +78,33 @@ function addMyBalancerButton(){
 // ================= INIT =================
 function init(){
     injectCSS();
-    loadActiveSources(function(){
-        addMyBalancerButton();
+    loadPluginSources();
+
+    var S = Lampa.SettingsApi||Lampa.Settings;
+    if(!S||!S.addComponent) return;
+
+    S.addComponent({
+        component:'filmhub_plus',
+        name:`FilmHub+ ${VERSION}`,
+        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
     });
-    if(Lampa.Noty) Lampa.Noty.show(`Мій мультибалансер ${VERSION} завантажено`);
+
+    S.addParam({
+        component:'filmhub_plus',
+        param:{name:'filmhub_open',type:'button'},
+        field:{name:'Відкрити FilmHub+'},
+        onChange: openFilmHubModal
+    });
+
+    if(Lampa.Noty) Lampa.Noty.show(`FilmHub+ ${VERSION} завантажено`);
 }
 
-// ================= СТАРТ =================
+function start(){
+    init();
+}
+
 if(Lampa.Listener){
-    Lampa.Listener.follow('app',function(e){ if(e && e.type==='ready') init(); });
-} else init();
+    Lampa.Listener.follow('app', function(e){if(e&&e.type==='ready') start();});
+}else start();
 
 })();
