@@ -1,61 +1,63 @@
-(function () {
+(function(){
 
-    if (!window.Lampa) return;
+if(!window.Lampa) return;
 
-    console.log('FilmHub+ loaded');
+console.log('FilmHub+ loaded');
 
-    var component = {};
+var component = {};
 
-    component.create = function () {
-        var movie = this.activity.movie;
+component.create = function(){
+    var movie = this.activity.movie;
 
-        this.activity.loader(true);
+    this.activity.render(`
+        <div style="padding:50px">
+            <h1>🎬 FilmHub+</h1>
+            <h2>${movie.title || movie.name}</h2>
+        </div>
+    `);
+};
 
-        this.activity.render(`
-            <div style="padding:40px">
-                <h1>🎬 FilmHub+</h1>
-                <h2>${movie.title || movie.name}</h2>
+component.destroy = function(){};
 
-                <div class="selector" style="margin-top:30px">
-                    ▶ Тестове джерело
-                </div>
-            </div>
-        `);
+Lampa.Component.add('filmhub_plus', component);
 
-        this.activity.loader(false);
-    };
+function insertButton(){
 
-    component.destroy = function () {};
+    var buttons = document.querySelector('.full-start__buttons');
 
-    Lampa.Component.add('filmhub_plus', component);
+    if(!buttons) return;
+    if(buttons.querySelector('.filmhub-btn')) return;
 
-    function insertButton() {
+    var btn = document.createElement('div');
+    btn.className = 'full-start__button selector filmhub-btn';
+    btn.innerHTML = `
+        <svg width="26" height="26" viewBox="0 0 24 24" fill="currentColor">
+            <path d="M4 4h16v16H4z"/>
+            <path d="M10 8l6 4-6 4z" fill="#000"/>
+        </svg>
+        <span>FilmHub+</span>
+    `;
 
-        var card = $('.full-start__buttons');
+    btn.addEventListener('click', function(){
 
-        if (!card.length) return;
-        if (card.find('.filmhub-btn').length) return;
+        var movie = Lampa.Activity.active().movie;
 
-        var btn = $('<div class="full-start__button selector filmhub-btn">🎬 FilmHub+</div>');
-
-        btn.on('hover:enter', function () {
-
-            var movie = Lampa.Activity.active().movie;
-
-            Lampa.Activity.push({
-                component: 'filmhub_plus',
-                movie: movie
-            });
-
+        Lampa.Activity.push({
+            component: 'filmhub_plus',
+            movie: movie
         });
 
-        card.append(btn);
+    });
+
+    buttons.prepend(btn); // 🔥 ВСТАВЛЯЄМО ЗЛІВА
+}
+
+Lampa.Listener.follow('activity', function(e){
+
+    if(e.component === 'full'){
+        setTimeout(insertButton, 300);
     }
 
-    Lampa.Listener.follow('activity', function (e) {
-        if (e.component == 'full') {
-            setTimeout(insertButton, 500);
-        }
-    });
+});
 
 })();
