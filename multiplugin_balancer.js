@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.2.2';
+    const VERSION = 'v4.3';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -35,11 +35,12 @@
         document.head.appendChild(style);
     }
 
-    function updateTitle() {
+    function updateTitle(modalTitle) {
+        if (!modalTitle) return;
         var title = hasChanges
             ? `Мій мультиплагін ${VERSION} — Балансери ●`
             : `Мій мультиплагін ${VERSION} — Балансери`;
-        $('.modal__title').text(title);
+        modalTitle.text(title);
     }
 
     function enableOutsideClose(container, onClose) {
@@ -64,6 +65,26 @@
         if (typeof onClose === 'function') onClose();
     }
 
+    function openModalWrapper(title, container, onBack) {
+        Lampa.Modal.open({
+            title: title,
+            html: container,
+            size: 'medium',
+            scroll_to_center: true,
+            onBack: function () {
+                closeModal(onBack);
+                return true;
+            }
+        });
+
+        setTimeout(function () {
+            Lampa.Controller.collectionSet(container);
+            Lampa.Controller.collectionFocus(container.find('.selector').first());
+            enableOutsideClose(container, onBack);
+            updateTitle($('.modal__title'));
+        }, 200);
+    }
+
     function openEditModal(src, isNew, callback) {
         var title = isNew ? 'Додати джерело' : 'Редагувати джерело';
         var form = $(`
@@ -82,12 +103,7 @@
             Lampa.Modal.close();
         });
 
-        Lampa.Modal.open({
-            title: title,
-            html: form,
-            size: 'medium',
-            onBack: function () { return true; }
-        });
+        openModalWrapper(title, form);
     }
 
     function renderSources(container) {
@@ -114,14 +130,14 @@
                 $(this).removeClass('enabled disabled').addClass(tempState[key] ? 'enabled' : 'disabled').text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
-                updateTitle();
+                updateTitle($('.modal__title'));
             });
 
             item.find('.multi-edit').on('hover:enter', function () {
                 openEditModal(src, false, function (newData) {
                     src.name = newData.name;
                     src.url = newData.url;
-                    // Перевірка ключа для tempState
+                    // Оновлюємо ключ tempState
                     var oldKey = key;
                     key = 'multi_' + src.name;
                     tempState[key] = tempState[oldKey];
@@ -163,23 +179,9 @@
         var container = $('<div class="multi-container"></div>');
 
         renderSources(container);
-
-        Lampa.Modal.open({
-            title: `Мій мультиплагін ${VERSION} — Балансери`,
-            html: container,
-            size: 'medium',
-            onBack: function () {
-                closeModal(function () { Lampa.Controller.toggle('settings_component'); });
-                return true;
-            }
+        openModalWrapper(`Мій мультиплагін ${VERSION} — Балансери`, container, function () {
+            Lampa.Controller.toggle('settings_component');
         });
-
-        setTimeout(function () {
-            Lampa.Controller.collectionSet(container);
-            Lampa.Controller.collectionFocus(container.find('.selector').first());
-            enableOutsideClose(container, function () { Lampa.Controller.toggle('settings_component'); });
-            updateTitle();
-        }, 200);
     }
 
     function loadActiveSources() {
