@@ -3,133 +3,106 @@
 
 if(!window.Lampa) return;
 
-const VERSION = 'v1.0.1';
+const VERSION = 'v1.0';
+
 var wrapper;
-var pluginsSources = [
+var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
     { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
-    { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
-    { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
+    { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" }
 ];
 
 // ================= CSS =================
 function injectCSS(){
     if(document.getElementById('filmhub-style')) return;
     var style = document.createElement('style');
-    style.id='filmhub-style';
+    style.id = 'filmhub-style';
     style.innerHTML = `
         .filmhub-container{padding:15px;}
-        .filmhub-item{padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.05);border-radius:8px;cursor:pointer;color:#fff;}
-        .filmhub-title{font-size:14px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;}
-        .filmhub-button{padding:8px 10px;border-radius:6px;background:#156DD1;color:#fff;cursor:pointer;margin-top:5px;display:inline-block;}
+        .filmhub-item{padding:10px;margin-bottom:8px;background:rgba(255,255,255,0.05);border-radius:8px;cursor:pointer;}
+        .filmhub-item:hover{background:rgba(255,255,255,0.1);}
     `;
     document.head.appendChild(style);
 }
 
-// ================= LOAD PLUGINS =================
-function loadPluginSources(){
-    pluginsSources.forEach(src=>{
+// ================= Storage =================
+function loadActiveSources(){
+    sources.forEach(function(src){
+        var enabled = Lampa.Storage.get('filmhub_'+src.name,false);
+        if(!enabled) return;
         if(document.querySelector('script[src="'+src.url+'"]')) return;
-        var s = document.createElement('script');
-        s.src = src.url;
-        s.async = false;
+        var s=document.createElement('script');
+        s.src=src.url;
         document.body.appendChild(s);
     });
 }
 
-// ================= RENDER =================
-function renderFilmHub(){
-    wrapper.empty();
-    var container = $('<div class="filmhub-container"></div>');
+// ================= View =================
+function renderModal(movie){
+    wrapper = $('<div class="filmhub-container"></div>');
 
-    pluginsSources.forEach(src=>{
-        var item = $(`<div class="filmhub-item selector"><div class="filmhub-title">${src.name}</div></div>`);
+    sources.forEach(function(src,index){
+        var item = $(`<div class="filmhub-item">${src.name}</div>`);
         item.on('hover:enter', function(){
-            if(Lampa.Noty) Lampa.Noty.show(`Вибрано джерело: ${src.name}`);
+            if(Lampa.Noty) Lampa.Noty.show(`Вибране джерело: ${src.name}`);
+            // Тут можна викликати методи плагіну джерела для отримання серій/посилань
         });
-        container.append(item);
+        wrapper.append(item);
     });
 
-    wrapper.append(container);
-    setTimeout(function(){
-        Lampa.Controller.collectionSet(wrapper);
-        Lampa.Controller.collectionFocus(wrapper.find('.selector').first());
-    },100);
-}
-
-// ================= MAIN MODAL =================
-function openFilmHubModal(){
-    wrapper = $('<div></div>');
-    renderFilmHub();
-
     Lampa.Modal.open({
-        title:`FilmHub+ ${VERSION}`,
-        html:wrapper,
+        title:`FilmHub+ — ${movie.title||'Фільми/Серіали'}`,
+        html: wrapper,
         size:'medium',
         onBack:function(){
             Lampa.Modal.close();
-            Lampa.Controller.toggle('settings_component');
             return true;
         }
     });
 }
 
-// ================= HIDE OTHER PLUGINS =================
+// ================= Приховування інших плагінів =================
 function hideOtherPlugins(){
     if(!Lampa.SettingsApi || !Lampa.SettingsApi.components) return;
+
     Object.keys(Lampa.SettingsApi.components).forEach(c=>{
         if(c!=='filmhub_plus'){
-            Lampa.SettingsApi.components[c].hidden = true;
+            var comp = Lampa.SettingsApi.components[c];
+            if(comp && comp.field && comp.field[0]){
+                comp.field[0].hidden = true;
+            }
         }
     });
 }
 
-// ================= ADD BUTTON TO MOVIE CARD =================
-function addFilmHubButton(card){
-    if(!card || card.find('.filmhub-button').length) return;
-    var btn = $('<div class="filmhub-button selector">Відкрити FilmHub+</div>');
-    btn.on('hover:enter', openFilmHubModal);
-    card.append(btn);
+// ================= Додавання кнопки в картку фільму =================
+function addMovieButton(){
+    if(!Lampa.Card || !Lampa.Card.addButton) return;
+
+    Lampa.Card.addButton('filmhub_plus', {
+        name:'FilmHub+',
+        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>',
+        onClick:function(card){
+            renderModal(card.movie||{title:'Фільм/Серіал'});
+        }
+    });
 }
 
-// ================= INIT =================
+// ================= Ініціалізація =================
 function init(){
     injectCSS();
-    loadPluginSources();
     hideOtherPlugins();
-
-    var S = Lampa.SettingsApi||Lampa.Settings;
-    if(!S||!S.addComponent) return;
-
-    S.addComponent({
-        component:'filmhub_plus',
-        name:`FilmHub+ ${VERSION}`,
-        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-    });
-
-    S.addParam({
-        component:'filmhub_plus',
-        param:{name:'filmhub_open',type:'button'},
-        field:{name:'Відкрити FilmHub+'},
-        onChange: openFilmHubModal
-    });
-
-    // Кнопка в картці фільму/серіалу
-    if(Lampa.Listener){
-        Lampa.Listener.follow('card', function(card){
-            addFilmHubButton(card);
-        });
-    }
+    addMovieButton();
+    loadActiveSources();
 
     if(Lampa.Noty) Lampa.Noty.show(`FilmHub+ ${VERSION} завантажено`);
 }
 
-function start(){
-    init();
-}
-
+// ================= Старт =================
 if(Lampa.Listener){
-    Lampa.Listener.follow('app', function(e){if(e&&e.type==='ready') start();});
-}else start();
+    Lampa.Listener.follow('app',function(e){
+        if(e && e.type==='ready') init();
+    });
+}else init();
 
 })();
