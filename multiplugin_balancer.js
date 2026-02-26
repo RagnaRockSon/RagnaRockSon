@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.4.8';
+const VERSION = 'v4.4.9';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -23,22 +23,17 @@ function injectCSS() {
     style.id = 'multi-style';
     style.innerHTML = `
         .multi-container { padding:20px; transition: all 0.3s ease; }
-        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:12px 15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.3s ease; }
-        .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
-        .multi-left { flex:1; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+        .multi-item { display:flex; align-items:center; justify-content:space-between; padding:12px 10px; margin-bottom:10px; border-radius:10px; background:rgba(255,255,255,0.05); }
+        .multi-left { flex:1; margin-right:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:16px; }
         .multi-right { display:flex; gap:8px; flex-shrink:0; }
-        .multi-btn { display:flex; align-items:center; justify-content:center; min-width:80px; height:36px; padding:0 8px; border-radius:10px; font-size:14px; cursor:pointer; color:#fff; transition: all 0.3s ease; flex-shrink:0; }
+        .multi-btn { min-width:70px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:14px; cursor:pointer; color:#fff; }
         .multi-toggle.enabled { background:#46b85a; }
         .multi-toggle.disabled { background:#d24a4a; }
         .multi-btn-edit { background:#FF9800; }
         .multi-btn-delete { background:#d24a4a; }
         .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
-        .multi-add { text-align:center; margin-bottom:10px; padding:12px; background:#46b85a; border-radius:10px; cursor:pointer; font-weight:bold; color:#fff; transition: all 0.3s ease; }
         .modal-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:10px; border-radius:5px; margin-bottom:10px; width:100%; box-sizing:border-box; }
         .modal-input::placeholder { color:rgba(255,255,255,0.5); }
-        .modal-btn { flex:1; padding:10px; margin:0 5px; border-radius:8px; text-align:center; cursor:pointer; font-weight:bold; transition: all 0.3s ease; color:#fff; }
-        .modal-btn-save { background:#156DD1; }
-        .modal-btn-cancel { background:#555; }
     `;
     document.head.appendChild(style);
 }
@@ -76,9 +71,8 @@ function closeModal(modal) {
 function loadSourcesFromStorage() {
     var saved = Lampa.Storage.get('multi_sources', null);
     if (saved) {
-        try {
-            sources = JSON.parse(saved);
-        } catch (e) { console.error('[MultiPlugin] Error loading sources:', e); }
+        try { sources = JSON.parse(saved); } 
+        catch (e) { console.error('[MultiPlugin] Error loading sources:', e); }
     }
 }
 
@@ -86,92 +80,87 @@ function saveSourcestoStorage() {
     Lampa.Storage.set('multi_sources', JSON.stringify(sources));
 }
 
+// --- Edit / Add Modal ---
 function openEditModal(index, callback) {
     var src = sources[index];
     var formHtml = $(`
-        <div style="padding:20px; display:flex; flex-direction:column;">
+        <div style="padding:20px;">
+            <label>Назва:</label>
             <input type="text" class="modal-input edit-name" value="${src.name}" placeholder="Введіть назву">
+            <label>URL:</label>
             <input type="text" class="modal-input edit-url" value="${src.url}" placeholder="Введіть URL">
-            <div style="display:flex; margin-top:10px;">
-                <div class="modal-btn modal-btn-save selector">Зберегти</div>
-                <div class="modal-btn modal-btn-cancel selector">Скасувати</div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div class="selector" style="flex:1; padding:10px; background:#156DD1; text-align:center; border-radius:5px; cursor:pointer;">Зберегти</div>
+                <div class="selector" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
             </div>
         </div>
     `);
-
-    var saveBtn = formHtml.find('.modal-btn-save');
-    var cancelBtn = formHtml.find('.modal-btn-cancel');
+    var saveBtn = formHtml.find('.selector').first();
+    var cancelBtn = formHtml.find('.selector').last();
 
     saveBtn.on('hover:enter', function () {
         var newName = formHtml.find('.edit-name').val().trim();
         var newUrl = formHtml.find('.edit-url').val().trim();
-        if (!newName || !newUrl) {
-            if (Lampa.Noty) Lampa.Noty.show('Заповніть всі поля');
-            return;
-        }
+        if (!newName || !newUrl) { if (Lampa.Noty) Lampa.Noty.show('Заповніть всі поля'); return; }
         sources[index] = { name: newName, url: newUrl };
         saveSourcestoStorage();
         hasChanges = true;
         Lampa.Modal.close();
         if (callback) callback();
     });
-
     cancelBtn.on('hover:enter', function () { Lampa.Modal.close(); });
 
-    Lampa.Modal.open({ title:'Редагування джерела', html:formHtml, size:'medium', onBack:function(){ Lampa.Modal.close(); return true; } });
+    Lampa.Modal.open({ title: 'Редагування джерела', html: formHtml, size: 'medium', onBack: function(){ Lampa.Modal.close(); return true; } });
 }
 
 function openAddModal(callback) {
     var formHtml = $(`
-        <div style="padding:20px; display:flex; flex-direction:column;">
+        <div style="padding:20px;">
+            <label>Назва:</label>
             <input type="text" class="modal-input add-name" placeholder="Введіть назву джерела">
+            <label>URL:</label>
             <input type="text" class="modal-input add-url" placeholder="Введіть URL до скрипту">
-            <div style="display:flex; margin-top:10px;">
-                <div class="modal-btn modal-btn-save selector">Додати</div>
-                <div class="modal-btn modal-btn-cancel selector">Скасувати</div>
+            <div style="display:flex; gap:10px; margin-top:10px;">
+                <div class="selector" style="flex:1; padding:10px; background:#46b85a; text-align:center; border-radius:5px; cursor:pointer;">Додати</div>
+                <div class="selector" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
             </div>
         </div>
     `);
-
-    var addBtn = formHtml.find('.modal-btn-save');
-    var cancelBtn = formHtml.find('.modal-btn-cancel');
+    var addBtn = formHtml.find('.selector').first();
+    var cancelBtn = formHtml.find('.selector').last();
 
     addBtn.on('hover:enter', function () {
         var newName = formHtml.find('.add-name').val().trim();
         var newUrl = formHtml.find('.add-url').val().trim();
-        if (!newName || !newUrl) {
-            if (Lampa.Noty) Lampa.Noty.show('Заповніть всі поля');
-            return;
-        }
+        if (!newName || !newUrl) { if (Lampa.Noty) Lampa.Noty.show('Заповніть всі поля'); return; }
         sources.push({ name: newName, url: newUrl });
         saveSourcestoStorage();
         hasChanges = true;
         Lampa.Modal.close();
         if (callback) callback();
     });
-
     cancelBtn.on('hover:enter', function () { Lampa.Modal.close(); });
 
-    Lampa.Modal.open({ title:'Додавання нового джерела', html:formHtml, size:'medium', onBack:function(){ Lampa.Modal.close(); return true; } });
+    Lampa.Modal.open({ title: 'Додавання нового джерела', html: formHtml, size: 'medium', onBack: function(){ Lampa.Modal.close(); return true; } });
 }
 
+// --- Main Sources Modal ---
 function openSourcesModal() {
     tempState = {};
     hasChanges = false;
-
     var container = $('<div class="multi-container"></div>');
     var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
-    var addBtn = $('<div class="multi-add selector">+ Додати джерело</div>');
+    var addBtn = $('<div class="multi-btn multi-btn-add selector">+ Додати джерело</div>');
 
     function renderSources() {
-        container.empty();
-        sources.forEach(function(src,index){
+        container.find('.multi-item').remove();
+        sources.forEach(function (src,index) {
             var key = 'multi_' + src.name;
             var current = Lampa.Storage.get(key,false);
             tempState[key]=current;
 
             var item = $(`
-                <div class="multi-item selector">
+                <div class="multi-item selector" data-index="${index}">
                     <div class="multi-left">${src.name}</div>
                     <div class="multi-right">
                         <div class="multi-btn multi-toggle ${current?'enabled':'disabled'}" data-key="${key}">${current?'Увімкнено':'Вимкнено'}</div>
@@ -181,27 +170,19 @@ function openSourcesModal() {
                 </div>
             `);
 
-            // Увімкнути/Вимкнути
+            // Toggle works like edit/delete
             item.find('.multi-toggle').on('hover:enter', function(){
                 var key = $(this).data('key');
                 tempState[key] = !tempState[key];
-                $(this).removeClass('enabled disabled').addClass(tempState[key]?'enabled':'disabled').text(tempState[key]?'Увімкнено':'Вимкнено');
-                hasChanges = true;
-                applyBtn.show();
-                updateTitle($('.modal__title'));
+                $(this).text(tempState[key]?'Увімкнено':'Вимкнено')
+                    .removeClass('enabled disabled')
+                    .addClass(tempState[key]?'enabled':'disabled');
+                hasChanges=true; applyBtn.show(); updateTitle($('.modal__title'));
             });
 
-            // Редагування
-            item.find('.multi-btn-edit').on('hover:enter', function(){ openEditModal($(this).data('index'),renderSources); });
-
-            // Видалення
+            item.find('.multi-btn-edit').on('hover:enter', function(){ openEditModal($(this).data('index'), renderSources); });
             item.find('.multi-btn-delete').on('hover:enter', function(){
-                var idx=$(this).data('index');
-                sources.splice(idx,1);
-                saveSourcestoStorage();
-                hasChanges=true;
-                renderSources();
-                updateTitle($('.modal__title'));
+                sources.splice($(this).data('index'),1); saveSourcestoStorage(); hasChanges=true; renderSources(); updateTitle($('.modal__title'));
             });
 
             container.append(item);
@@ -222,7 +203,12 @@ function openSourcesModal() {
         if(Lampa.Manifest && typeof Lampa.Manifest.app_reload==='function'){ Lampa.Manifest.app_reload(); } else { location.reload(); }
     });
 
-    Lampa.Modal.open({ title:`Мій мультиплагін ${VERSION} — Балансери`, html:container, size:'medium', onBack:function(){ closeModal({onClose:function(){ Lampa.Controller.toggle('settings_component'); }}); return true; } });
+    Lampa.Modal.open({
+        title: `Мій мультиплагін ${VERSION} — Балансери`,
+        html: container,
+        size:'medium',
+        onBack:function(){ closeModal({onClose:function(){ Lampa.Controller.toggle('settings_component'); }}); return true; }
+    });
 
     setTimeout(function(){
         Lampa.Controller.collectionSet(container);
@@ -234,46 +220,28 @@ function openSourcesModal() {
 
 function loadActiveSources() {
     sources.forEach(function(src){
-        var enabled = Lampa.Storage.get('multi_'+src.name,false);
+        var enabled=Lampa.Storage.get('multi_'+src.name,false);
         if(!enabled) return;
         if(document.querySelector('script[src="'+src.url+'"]')) return;
         var script=document.createElement('script');
-        script.src=src.url;
-        script.async=false;
+        script.src=src.url; script.async=false;
         document.body.appendChild(script);
     });
 }
 
-function initSettings(){
+function initSettings() {
     var SettingsApi=Lampa.SettingsApi||Lampa.Settings;
     if(!SettingsApi||!SettingsApi.addComponent) return;
-
-    SettingsApi.addComponent({
-        component:'multi_balancers',
-        name:`Мій мультиплагін ${VERSION}`,
-        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-    });
-
-    SettingsApi.addParam({
-        component:'multi_balancers',
-        param:{name:'multi_manage',type:'button'},
-        field:{name:'Керування балансерами'},
-        onChange:openSourcesModal
-    });
+    SettingsApi.addComponent({component:'multi_balancers',name:`Мій мультиплагін ${VERSION}`,icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'});
+    SettingsApi.addParam({component:'multi_balancers',param:{name:'multi_manage',type:'button'},field:{name:'Керування балансерами'},onChange:openSourcesModal});
 }
 
 function start(){
-    injectCSS();
-    loadSourcesFromStorage();
-    loadActiveSources();
-    initSettings();
-
-    if(Lampa.Noty){ Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`); }
+    injectCSS(); loadSourcesFromStorage(); loadActiveSources(); initSettings();
+    if(Lampa.Noty){ Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);}
     console.log(`[MultiPlugin ${VERSION}] Loaded`);
 }
 
-if(Lampa.Listener){
-    Lampa.Listener.follow('app',function(e){ if(e && e.type==='ready') start(); });
-}else{ start(); }
+if(Lampa.Listener){ Lampa.Listener.follow('app',function(e){if(e&&e.type==='ready') start();}); } else { start(); }
 
 })();
