@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v2.0';
+    const VERSION = 'v2.1';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -15,6 +15,7 @@
     var tempState = {};
     var hasChanges = false;
     var outsideHandler = null;
+    var lastPluginContainer = null; // Для відновлення меню плагіну після закриття модалки
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
@@ -24,7 +25,7 @@
         style.innerHTML = `
             .multi-container { padding:20px; }
             .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; }
-            .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; }
+            .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; cursor:pointer; }
             .multi-toggle.enabled { background:#46b85a; }
             .multi-toggle.disabled { background:#d24a4a; }
             .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
@@ -41,17 +42,13 @@
     }
 
     function enableOutsideClose(container) {
-
         setTimeout(function () {
-
             outsideHandler = function (e) {
                 if (!$(e.target).closest('.multi-container').length) {
                     closeModal();
                 }
             };
-
             $('.modal').on('mousedown.multi', outsideHandler);
-
         }, 200);
     }
 
@@ -63,18 +60,25 @@
     function closeModal() {
         disableOutsideClose();
         Lampa.Modal.close();
+
+        // Відновлюємо меню плагіну після закриття модалки
+        if (lastPluginContainer && lastPluginContainer.length) {
+            Lampa.Controller.collectionSet(lastPluginContainer);
+            Lampa.Controller.collectionFocus(lastPluginContainer.find('.selector').first());
+        }
     }
 
     function openSourcesModal() {
-
         tempState = {};
         hasChanges = false;
+
+        // Зберігаємо стан меню плагіну перед відкриттям модалки
+        lastPluginContainer = $('.settings-component[multi_balancers]');
 
         var container = $('<div class="multi-container"></div>');
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
 
         sources.forEach(function (src) {
-
             var key = 'multi_' + src.name;
             var current = Lampa.Storage.get(key, false);
             tempState[key] = current;
@@ -89,7 +93,6 @@
             `);
 
             item.on('hover:enter', function () {
-
                 tempState[key] = !tempState[key];
 
                 item.find('.multi-toggle')
@@ -106,7 +109,6 @@
         });
 
         applyBtn.on('hover:enter', function () {
-
             if (!hasChanges) return;
 
             Object.keys(tempState).forEach(function (k) {
@@ -155,7 +157,6 @@
     }
 
     function initSettings() {
-
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
         if (!SettingsApi || !SettingsApi.addComponent) return;
 
