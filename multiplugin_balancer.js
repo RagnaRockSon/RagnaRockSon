@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.2.1';
+    const VERSION = 'v4.2.2';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -92,27 +92,28 @@
 
     function renderSources(container) {
         container.empty();
+        var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
+        applyBtn.hide();
 
-        sources.forEach(function (src, index) {
+        sources.forEach(function (src) {
             var key = 'multi_' + src.name;
-            var current = tempState[key] !== undefined ? tempState[key] : Lampa.Storage.get(key, false);
+            if (tempState[key] === undefined) tempState[key] = Lampa.Storage.get(key, false);
 
             var item = $(`
                 <div class="multi-item selector">
                     <div>${src.name}</div>
                     <div>
-                        <span class="multi-toggle ${current ? 'enabled' : 'disabled'}">${current ? 'Увімкнено' : 'Вимкнено'}</span>
+                        <span class="multi-toggle ${tempState[key] ? 'enabled' : 'disabled'}">${tempState[key] ? 'Увімкнено' : 'Вимкнено'}</span>
                         <span class="multi-edit selector">✎</span>
                     </div>
                 </div>
             `);
 
             item.find('.multi-toggle').on('hover:enter', function () {
-                tempState[key] = !current;
-                current = tempState[key];
-                $(this).removeClass('enabled disabled').addClass(current ? 'enabled' : 'disabled').text(current ? 'Увімкнено' : 'Вимкнено');
+                tempState[key] = !tempState[key];
+                $(this).removeClass('enabled disabled').addClass(tempState[key] ? 'enabled' : 'disabled').text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
-                container.find('.multi-apply').show();
+                applyBtn.show();
                 updateTitle();
             });
 
@@ -120,6 +121,11 @@
                 openEditModal(src, false, function (newData) {
                     src.name = newData.name;
                     src.url = newData.url;
+                    // Перевірка ключа для tempState
+                    var oldKey = key;
+                    key = 'multi_' + src.name;
+                    tempState[key] = tempState[oldKey];
+                    delete tempState[oldKey];
                     renderSources(container);
                 });
             });
@@ -136,8 +142,8 @@
         });
 
         container.append(addBtn);
+        container.append(applyBtn);
 
-        var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
         applyBtn.on('hover:enter', function () {
             Object.keys(tempState).forEach(function (k) {
                 Lampa.Storage.set(k, tempState[k]);
@@ -149,7 +155,6 @@
                 location.reload();
             }
         });
-        container.append(applyBtn);
     }
 
     function openSourcesModal() {
