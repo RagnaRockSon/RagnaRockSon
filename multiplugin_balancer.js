@@ -253,6 +253,7 @@ function openSourcesModal(){
             return true;
         }
     });
+}
 
 // ================= INIT =================
 function loadActive(){
@@ -289,8 +290,8 @@ function start(){
     loadActive();
     init();
 
-if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
-
+    // === показуємо сповіщення про завантаження плагіна
+    if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
 }
 
 if(Lampa.Listener){
