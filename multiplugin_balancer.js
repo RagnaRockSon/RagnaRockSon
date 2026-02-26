@@ -11,20 +11,20 @@
     ];
 
     var tempState = {};
+    var outsideHandler = null;
 
     function injectCSS() {
-        if (document.getElementById('multi-plugin-style')) return;
+        if (document.getElementById('multi-style')) return;
 
         var style = document.createElement('style');
-        style.id = 'multi-plugin-style';
+        style.id = 'multi-style';
         style.innerHTML = `
         .multi-container { padding:20px; }
-        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
-        .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
-        .multi-toggle { padding:6px 14px; border-radius:20px; font-weight:bold; min-width:120px; text-align:center; transition:0.3s; color:#fff; }
-        .multi-toggle.enabled { background:#46b85a; box-shadow:0 0 8px #46b85a; }
-        .multi-toggle.disabled { background:#d24a4a; box-shadow:0 0 8px #d24a4a; }
-        .multi-apply, .multi-back { text-align:center; margin-top:15px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; transition:0.3s; color:#fff; }
+        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; }
+        .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; }
+        .multi-toggle.enabled { background:#46b85a; }
+        .multi-toggle.disabled { background:#d24a4a; }
+        .multi-apply, .multi-back { text-align:center; margin-top:15px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; color:#fff; }
         .multi-apply { background:#156DD1; }
         .multi-back { background:#777; }
         `;
@@ -35,7 +35,6 @@
         sources.forEach(function (src) {
             var enabled = Lampa.Storage.get('multi_' + src.name, false);
             if (!enabled) return;
-
             if (document.querySelector('script[src="' + src.url + '"]')) return;
 
             var script = document.createElement('script');
@@ -54,22 +53,36 @@
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
-        function closeModal() {
-            $(document).off('click.multiOutside');
-            if (Lampa.Modal) Lampa.Modal.close();
+        function restoreSettingsController() {
+            if (Lampa.Settings && Lampa.Settings.update) {
+                Lampa.Settings.update();
+            }
         }
 
-        // Outside click
-        setTimeout(function () {
-            $(document).on('click.multiOutside', function (e) {
-                if (!container[0]) return;
+        function closeModal() {
+            if (outsideHandler) {
+                $(document).off('click.multiOutside', outsideHandler);
+                outsideHandler = null;
+            }
 
-                if (!$(e.target).closest('.multi-container').length &&
-                    $(e.target).closest('.lampa-modal').length) {
-                    closeModal();
-                }
-            });
-        }, 200);
+            if (Lampa.Modal) Lampa.Modal.close();
+
+            // 🔥 ГОЛОВНЕ: повертаємо керування Settings
+            setTimeout(function(){
+                restoreSettingsController();
+            }, 50);
+        }
+
+        outsideHandler = function (e) {
+            if (!$(e.target).closest('.multi-container').length &&
+                $(e.target).closest('.lampa-modal').length) {
+                closeModal();
+            }
+        };
+
+        setTimeout(function(){
+            $(document).on('click.multiOutside', outsideHandler);
+        },100);
 
         sources.forEach(function (src) {
 
@@ -87,7 +100,6 @@
             `);
 
             item.on('hover:enter', function () {
-
                 tempState[key] = !tempState[key];
 
                 item.find('.multi-toggle')
@@ -122,17 +134,16 @@
         container.append(applyButton).append(backButton);
 
         Lampa.Modal.open({
-            title: 'Мій мультиплагін v1.5 — Балансери',
+            title: 'Мій мультиплагін v1.6 — Балансери',
             html: container
         });
 
-        // 🔥 ГОЛОВНИЙ FIX — даємо час Modal створитися
         setTimeout(function(){
             if (Lampa.Controller) {
                 Lampa.Controller.collectionSet(container);
                 Lampa.Controller.collectionFocus(container.find('.selector').first());
             }
-        }, 100);
+        },100);
     }
 
     function initSettings() {
@@ -142,7 +153,7 @@
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
-            name: 'Мій мультиплагін v1.5',
+            name: 'Мій мультиплагін v1.6',
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
