@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    var VERSION = 'v1.8';
+    const VERSION = 'v1.9';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -16,16 +16,15 @@
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
-
         var style = document.createElement('style');
         style.id = 'multi-style';
         style.innerHTML = `
-        .multi-container { padding:20px; }
-        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; }
-        .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; }
-        .multi-toggle.enabled { background:#46b85a; }
-        .multi-toggle.disabled { background:#d24a4a; }
-        .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
+            .multi-container { padding:20px; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; }
+            .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; }
+            .multi-toggle.enabled { background:#46b85a; }
+            .multi-toggle.disabled { background:#d24a4a; }
+            .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
         `;
         document.head.appendChild(style);
     }
@@ -49,8 +48,9 @@
         var hasChanges = false;
 
         var container = $('<div class="multi-container"></div>');
-        var applyButton = $('<div class="multi-apply selector">Застосувати зміни</div>');
+        var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
 
+        // Створюємо список перемикачів
         sources.forEach(function (src) {
 
             var key = 'multi_' + src.name;
@@ -76,13 +76,14 @@
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
 
                 hasChanges = true;
-                applyButton.show();
+                applyBtn.show();
             });
 
             container.append(item);
         });
 
-        applyButton.on('hover:enter', function () {
+        // Натискання Apply
+        applyBtn.on('hover:enter', function () {
 
             if (!hasChanges) return;
 
@@ -90,17 +91,24 @@
                 Lampa.Storage.set(k, tempState[k]);
             });
 
-            location.reload();
+            // Перезавантаження Lampa
+            if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
+                Lampa.Manifest.app_reload();
+            } else {
+                location.reload();
+            }
         });
 
-        container.append(applyButton);
+        container.append(applyBtn);
 
         Lampa.Modal.open({
             title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
             html: container,
             onBack: function () {
-                return true; // даємо Lampa самій закрити modal
-            }
+                return true; // Lampa закриє модальний
+            },
+            // Обов’язково обробляємо клік поза вікном
+            outside: true
         });
 
         setTimeout(function () {
@@ -132,11 +140,7 @@
         injectCSS();
         loadActiveSources();
         initSettings();
-
-        if (Lampa.Noty) {
-            Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
-        }
-
+        if (Lampa.Noty) Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
         console.log('[MultiPlugin ' + VERSION + '] Loaded');
     }
 
