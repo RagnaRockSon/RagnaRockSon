@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.3.9';
+const VERSION = 'v4.4';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -16,7 +16,6 @@ var tempState = {};
 var hasChanges = false;
 var outsideHandler = null;
 
-// Додаємо стилі
 function injectCSS() {
     if (document.getElementById('multi-style')) return;
 
@@ -24,16 +23,35 @@ function injectCSS() {
     style.id = 'multi-style';
     style.innerHTML = `
         .multi-container { padding:20px; transition: all 0.3s ease; }
-        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.3s ease; }
+        .multi-item {
+            display:flex;
+            justify-content:space-between;
+            align-items:center;
+            padding:15px 10px;
+            margin-bottom:10px;
+            background:rgba(255,255,255,0.05);
+            border-radius:10px;
+            transition: all 0.3s ease;
+            font-size:16px;
+        }
         .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
-        .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; cursor:pointer; transition: all 0.3s ease; }
-        .multi-toggle.enabled { background:#46b85a; }
-        .multi-toggle.disabled { background:#d24a4a; }
+        .multi-name { flex:1; }
+        .multi-actions { display:flex; gap:8px; align-items:center; }
+        .multi-toggle, .multi-btn {
+            padding:10px 18px;
+            border-radius:20px;
+            text-align:center;
+            cursor:pointer;
+            font-size:14px;
+            min-width:100px;
+            user-select:none;
+        }
+        .multi-toggle.enabled { background:#46b85a; color:#fff; }
+        .multi-toggle.disabled { background:#d24a4a; color:#fff; }
+        .multi-btn-edit { background:#FF9800; color:#fff; }
+        .multi-btn-delete { background:#d24a4a; color:#fff; }
+        .multi-btn-add { background:#46b85a; text-align:center; padding:15px; margin-bottom:10px; color:#fff; }
         .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
-        .multi-btn { padding:6px 12px; border-radius:6px; color:#fff; cursor:pointer; transition: all 0.3s ease; font-size:12px; }
-        .multi-btn-edit { background:#FF9800; }
-        .multi-btn-delete { background:#d24a4a; }
-        .multi-btn-add { background:#46b85a; text-align:center; padding:15px; margin-bottom:10px; }
         .modal-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:10px; border-radius:5px; margin-bottom:10px; width:100%; box-sizing:border-box; }
         .modal-input::placeholder { color:rgba(255,255,255,0.5); }
     `;
@@ -85,17 +103,16 @@ function saveSourcesToStorage() {
     Lampa.Storage.set('multi_sources', JSON.stringify(sources));
 }
 
-// Редагування джерела
 function openEditModal(index, callback) {
     var src = sources[index];
     var formHtml = $(`
         <div style="padding:20px;">
             <div style="margin-bottom:15px;">
-                <label>Назва:</label>
+                <label style="display:block; margin-bottom:5px;">Назва:</label>
                 <input type="text" class="modal-input edit-name" value="${src.name}" placeholder="Введіть назву">
             </div>
             <div style="margin-bottom:15px;">
-                <label>URL:</label>
+                <label style="display:block; margin-bottom:5px;">URL:</label>
                 <input type="text" class="modal-input edit-url" value="${src.url}" placeholder="Введіть URL">
             </div>
             <div style="display:flex; gap:10px;">
@@ -105,8 +122,8 @@ function openEditModal(index, callback) {
         </div>
     `);
 
-    var saveBtn = formHtml.find('.selector').first();
-    var cancelBtn = formHtml.find('.selector').last();
+    var saveBtn = formHtml.find('div').eq(2).find('.selector').first();
+    var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
 
     saveBtn.on('hover:enter', function () {
         var newName = formHtml.find('.edit-name').val().trim();
@@ -132,20 +149,22 @@ function openEditModal(index, callback) {
         title: 'Редагування джерела',
         html: formHtml,
         size: 'medium',
-        onBack: function () { Lampa.Modal.close(); return true; }
+        onBack: function () {
+            Lampa.Modal.close();
+            return true;
+        }
     });
 }
 
-// Додавання нового джерела
 function openAddModal(callback) {
     var formHtml = $(`
         <div style="padding:20px;">
             <div style="margin-bottom:15px;">
-                <label>Назва:</label>
+                <label style="display:block; margin-bottom:5px;">Назва:</label>
                 <input type="text" class="modal-input add-name" placeholder="Введіть назву джерела">
             </div>
             <div style="margin-bottom:15px;">
-                <label>URL:</label>
+                <label style="display:block; margin-bottom:5px;">URL:</label>
                 <input type="text" class="modal-input add-url" placeholder="Введіть URL до скрипту">
             </div>
             <div style="display:flex; gap:10px;">
@@ -155,8 +174,8 @@ function openAddModal(callback) {
         </div>
     `);
 
-    var addBtn = formHtml.find('.selector').first();
-    var cancelBtn = formHtml.find('.selector').last();
+    var addBtn = formHtml.find('div').eq(2).find('.selector').first();
+    var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
 
     addBtn.on('hover:enter', function () {
         var newName = formHtml.find('.add-name').val().trim();
@@ -182,11 +201,13 @@ function openAddModal(callback) {
         title: 'Додавання нового джерела',
         html: formHtml,
         size: 'medium',
-        onBack: function () { Lampa.Modal.close(); return true; }
+        onBack: function () {
+            Lampa.Modal.close();
+            return true;
+        }
     });
 }
 
-// Відкриття головного меню джерел
 function openSourcesModal() {
     tempState = {};
     hasChanges = false;
@@ -205,8 +226,8 @@ function openSourcesModal() {
 
             var item = $(`
                 <div class="multi-item selector" data-index="${index}">
-                    <div><strong>${src.name}</strong></div>
-                    <div style="display:flex; gap:10px; align-items:center;">
+                    <div class="multi-name"><strong>${src.name}</strong></div>
+                    <div class="multi-actions">
                         <div class="multi-toggle ${current ? 'enabled' : 'disabled'}" data-key="${key}">
                             ${current ? 'Увімкнено' : 'Вимкнено'}
                         </div>
@@ -216,14 +237,14 @@ function openSourcesModal() {
                 </div>
             `);
 
-            // Toggle працює лише на кнопці
+            // Toggle увімкнення/вимкнення
             item.find('.multi-toggle').on('hover:enter', function () {
-                var key = $(this).data('key');
-                tempState[key] = !tempState[key];
+                var k = $(this).data('key');
+                tempState[k] = !tempState[k];
                 $(this)
                     .removeClass('enabled disabled')
-                    .addClass(tempState[key] ? 'enabled' : 'disabled')
-                    .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
+                    .addClass(tempState[k] ? 'enabled' : 'disabled')
+                    .text(tempState[k] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
                 updateTitle($('.modal__title'));
@@ -234,7 +255,8 @@ function openSourcesModal() {
             });
 
             item.find('.multi-btn-delete').on('hover:enter', function () {
-                sources.splice($(this).data('index'), 1);
+                var idx = $(this).data('index');
+                sources.splice(idx, 1);
                 saveSourcesToStorage();
                 hasChanges = true;
                 renderSources();
@@ -256,13 +278,10 @@ function openSourcesModal() {
 
     applyBtn.on('hover:enter', function () {
         if (!hasChanges) return;
-
         Object.keys(tempState).forEach(function (k) {
             Lampa.Storage.set(k, tempState[k]);
         });
-
         disableOutsideClose();
-
         if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
             Lampa.Manifest.app_reload();
         } else {
