@@ -26,9 +26,7 @@
         .multi-toggle.disabled { background:#d24a4a; box-shadow:0 0 8px #d24a4a; }
         .multi-apply, .multi-back { text-align:center; margin-top:15px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; transition:0.3s; color:#fff; }
         .multi-apply { background:#156DD1; }
-        .multi-apply.focus { background:#1f82ff; transform:scale(1.05); }
         .multi-back { background:#777; }
-        .multi-back.focus { background:#999; }
         `;
         document.head.appendChild(style);
     }
@@ -58,25 +56,20 @@
 
         function closeModal() {
             $(document).off('click.multiOutside');
-            if (Lampa.Modal && Lampa.Modal.close) {
-                Lampa.Modal.close();
-            }
+            if (Lampa.Modal) Lampa.Modal.close();
         }
 
-        // ✅ СТАБІЛЬНИЙ outside click
+        // Outside click
         setTimeout(function () {
             $(document).on('click.multiOutside', function (e) {
-
                 if (!container[0]) return;
 
-                var clickedInside = $(e.target).closest('.multi-container').length > 0;
-                var clickedModal = $(e.target).closest('.lampa-modal').length > 0;
-
-                if (!clickedInside && clickedModal) {
+                if (!$(e.target).closest('.multi-container').length &&
+                    $(e.target).closest('.lampa-modal').length) {
                     closeModal();
                 }
             });
-        }, 150);
+        }, 200);
 
         sources.forEach(function (src) {
 
@@ -84,4 +77,95 @@
             var current = Lampa.Storage.get(key, false);
             tempState[key] = current;
 
-            var item
+            var item = $(`
+                <div class="multi-item selector">
+                    <div>${src.name}</div>
+                    <div class="multi-toggle ${current ? 'enabled' : 'disabled'}">
+                        ${current ? 'Увімкнено' : 'Вимкнено'}
+                    </div>
+                </div>
+            `);
+
+            item.on('hover:enter', function () {
+
+                tempState[key] = !tempState[key];
+
+                item.find('.multi-toggle')
+                    .removeClass('enabled disabled')
+                    .addClass(tempState[key] ? 'enabled' : 'disabled')
+                    .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
+
+                hasChanges = true;
+                applyButton.show();
+            });
+
+            container.append(item);
+        });
+
+        applyButton.on('hover:enter', function () {
+
+            if (!hasChanges) return;
+
+            Object.keys(tempState).forEach(function (k) {
+                Lampa.Storage.set(k, tempState[k]);
+            });
+
+            if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
+                Lampa.Manifest.app_reload();
+            } else {
+                location.reload();
+            }
+        });
+
+        backButton.on('hover:enter', closeModal);
+
+        container.append(applyButton).append(backButton);
+
+        Lampa.Modal.open({
+            title: 'Мій мультиплагін v1.5 — Балансери',
+            html: container
+        });
+
+        // 🔥 ГОЛОВНИЙ FIX — даємо час Modal створитися
+        setTimeout(function(){
+            if (Lampa.Controller) {
+                Lampa.Controller.collectionSet(container);
+                Lampa.Controller.collectionFocus(container.find('.selector').first());
+            }
+        }, 100);
+    }
+
+    function initSettings() {
+
+        var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
+        if (!SettingsApi || !SettingsApi.addComponent) return;
+
+        SettingsApi.addComponent({
+            component: 'multi_balancers',
+            name: 'Мій мультиплагін v1.5',
+            icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
+        });
+
+        SettingsApi.addParam({
+            component: 'multi_balancers',
+            param: { name: 'multi_manage', type: 'button' },
+            field: { name: 'Керування балансерами' },
+            onChange: openSourcesModal
+        });
+    }
+
+    function start() {
+        injectCSS();
+        loadActiveSources();
+        initSettings();
+    }
+
+    if (Lampa.Listener) {
+        Lampa.Listener.follow('app', function (e) {
+            if (e && e.type === 'ready') start();
+        });
+    } else {
+        start();
+    }
+
+})();
