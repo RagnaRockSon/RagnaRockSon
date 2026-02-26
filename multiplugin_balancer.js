@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.5.0';
+const VERSION = 'v4.5.1';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -163,13 +163,14 @@ function openSourcesModal() {
                 <div class="multi-item selector" data-index="${index}">
                     <div class="multi-left">${src.name}</div>
                     <div class="multi-right">
-                        <div class="multi-btn multi-toggle ${current?'enabled':'disabled'}" data-key="${key}"> ${current?'Увімкнено':'Вимкнено'} </div>
+                        <div class="multi-btn multi-toggle selector" data-key="${key}"> ${current?'Увімкнено':'Вимкнено'} </div>
                         <div class="multi-btn multi-btn-edit selector" data-index="${index}">✏️</div>
                         <div class="multi-btn multi-btn-delete selector" data-index="${index}">🗑️</div>
                     </div>
                 </div>
             `);
 
+            // Логіка увімкнення/вимкнення як у редагування/видалення
             item.find('.multi-toggle').on('hover:enter', function(){
                 var key = $(this).data('key');
                 tempState[key] = !tempState[key];
