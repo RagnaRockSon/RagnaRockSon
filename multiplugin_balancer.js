@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.5.9';
+const VERSION = 'v4.6.0';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -14,257 +14,288 @@ var sources = [
 
 var tempState = {};
 var hasChanges = false;
-var viewMode = 'list'; // list | add | edit
-var editIndex = null;
-var wrapper;
+var outsideHandler = null;
 
-/* ================= CSS ================= */
-
+// ===== CSS =====
 function injectCSS() {
     if (document.getElementById('multi-style')) return;
 
     var style = document.createElement('style');
     style.id = 'multi-style';
     style.innerHTML = `
-        .multi-container { padding:15px; }
-        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:8px; }
-        .multi-left { width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; }
-        .multi-right { width:60%; display:flex; gap:6px; }
-        .multi-btn { flex:1; text-align:center; padding:8px 0; border-radius:6px; font-size:13px; cursor:pointer; color:#fff; }
-        .enabled { background:#46b85a; }
-        .disabled { background:#d24a4a; }
-        .edit { background:#FF9800; }
-        .delete { background:#f44336; }
-        .add { background:#156DD1; margin-top:10px; }
-        .apply { background:#156DD1; margin-top:12px; display:none; }
-        .modal-input { width:100%; padding:10px; margin-bottom:12px; border-radius:6px; border:1px solid rgba(255,255,255,0.2); background:rgba(255,255,255,0.1); color:#fff; }
+        .multi-container { padding:15px; transition: all 0.3s ease; }
+        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:8px; transition: all 0.3s ease; }
+        .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
+        .multi-left { width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; line-height:18px; }
+        .multi-right { width:60%; display:flex; justify-content:flex-end; gap:5px; }
+        .multi-btn { flex:1; text-align:center; padding:8px 0; border-radius:6px; font-size:13px; cursor:pointer; color:#fff; transition: all 0.3s ease; }
+        .multi-toggle.enabled { background:#46b85a; }
+        .multi-toggle.disabled { background:#d24a4a; }
+        .multi-btn-edit { background:#156DD1; }
+        .multi-btn-delete { background:#f44336; }
+        .multi-btn-add { background:#156DD1; padding:10px 0; margin-top:10px; border-radius:8px; text-align:center; font-weight:bold; }
+        .multi-apply { text-align:center; margin-top:12px; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
+        .modal-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:10px; border-radius:5px; margin-bottom:10px; width:100%; box-sizing:border-box; }
+        .modal-input::placeholder { color:rgba(255,255,255,0.5); }
+        .fade-in { animation: fadeIn 0.25s forwards; }
+        .fade-out { animation: fadeOut 0.25s forwards; }
+        @keyframes fadeIn { from {opacity:0; transform:scale(0.95);} to {opacity:1; transform:scale(1);} }
+        @keyframes fadeOut { from {opacity:1; transform:scale(1);} to {opacity:0; transform:scale(0.95);} }
     `;
     document.head.appendChild(style);
 }
 
-/* ================= STORAGE ================= */
+// ===== Загальні функції =====
+function updateTitle(modalTitle) {
+    if (!modalTitle) return;
+    var title = hasChanges
+        ? `Мій мультиплагін ${VERSION} — Балансери ●`
+        : `Мій мультиплагін ${VERSION} — Балансери`;
+    modalTitle.text(title);
+}
 
-function loadSources() {
+function enableOutsideClose(container, modal) {
+    setTimeout(function () {
+        outsideHandler = function (e) {
+            if (!$(e.target).closest(container).length && !$(e.target).closest('.modal').length) {
+                closeModal(modal);
+            }
+        };
+        $('.modal').on('mousedown.multi', outsideHandler);
+    }, 200);
+}
+
+function disableOutsideClose() {
+    $('.modal').off('mousedown.multi');
+    outsideHandler = null;
+}
+
+function closeModal(modal) {
+    disableOutsideClose();
+    if (modal && modal.onClose) modal.onClose();
+    Lampa.Modal.close();
+}
+
+function loadSourcesFromStorage() {
     var saved = Lampa.Storage.get('multi_sources', null);
     if (saved) {
-        try { sources = JSON.parse(saved); }
-        catch(e){ console.log(e); }
+        try { sources = JSON.parse(saved); } 
+        catch (e) { console.error('[MultiPlugin] Error loading sources:', e); }
     }
 }
 
-function saveSources() {
+function saveSourcestoStorage() {
     Lampa.Storage.set('multi_sources', JSON.stringify(sources));
 }
 
-/* ================= VIEW RENDER ================= */
-
-function renderList() {
-    viewMode = 'list';
-    wrapper.empty();
-
-    var container = $('<div class="multi-container"></div>');
-    var applyBtn = $('<div class="multi-btn apply selector">Застосувати зміни</div>');
-    var addBtn = $('<div class="multi-btn add selector">+ Додати джерело</div>');
-
-    sources.forEach(function(src,index){
-
-        var key = 'multi_' + src.name;
-        var current = Lampa.Storage.get(key,false);
-        tempState[key] = current;
-
-        var item = $(`
-            <div class="multi-item selector">
-                <div class="multi-left">${src.name}</div>
-                <div class="multi-right">
-                    <div class="multi-btn selector ${current?'enabled':'disabled'}" data-key="${key}">
-                        ${current?'Увімкнено':'Вимкнено'}
-                    </div>
-                    <div class="multi-btn edit selector" data-index="${index}">✏️</div>
-                    <div class="multi-btn delete selector" data-index="${index}">🗑️</div>
-                </div>
+// ===== Підмодалки =====
+function openEditModal(index, callback) {
+    var src = sources[index];
+    var formHtml = $(`
+        <div style="padding:20px;" class="fade-in">
+            <div style="margin-bottom:15px;">
+                <label>Назва:</label>
+                <input type="text" class="modal-input edit-name" value="${src.name}" placeholder="Введіть назву">
             </div>
-        `);
+            <div style="margin-bottom:15px;">
+                <label>URL:</label>
+                <input type="text" class="modal-input edit-url" value="${src.url}" placeholder="Введіть URL">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <div class="selector save-btn" style="flex:1; padding:10px; background:#46b85a; text-align:center; border-radius:5px; cursor:pointer;">Зберегти</div>
+                <div class="selector cancel-btn" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
+            </div>
+        </div>
+    `);
 
-        // toggle
-        item.find('[data-key]').on('hover:enter', function(){
-            var k = $(this).data('key');
-            tempState[k] = !tempState[k];
-            $(this)
-                .toggleClass('enabled disabled')
-                .text(tempState[k]?'Увімкнено':'Вимкнено');
-            hasChanges = true;
-            applyBtn.show();
-        });
-
-        // edit
-        item.find('.edit').on('hover:enter', function(){
-            editIndex = $(this).data('index');
-            renderEdit();
-        });
-
-        // delete
-        item.find('.delete').on('hover:enter', function(){
-            var i = $(this).data('index');
-            sources.splice(i,1);
-            saveSources();
-            renderList();
-        });
-
-        container.append(item);
+    formHtml.find('.save-btn').on('hover:enter', function () {
+        var newName = formHtml.find('.edit-name').val().trim();
+        var newUrl = formHtml.find('.edit-url').val().trim();
+        if (!newName || !newUrl) { Lampa.Noty.show('Заповніть всі поля'); return; }
+        sources[index] = { name: newName, url: newUrl };
+        saveSourcestoStorage();
+        hasChanges = true;
+        Lampa.Modal.close();
+        if(callback) callback();
     });
 
-    addBtn.on('hover:enter', function(){
-        renderAdd();
+    formHtml.find('.cancel-btn').on('hover:enter', function () { Lampa.Modal.close(); });
+
+    formHtml.find('input').on('keydown', function(e){
+        if(e.key === 'Escape') { Lampa.Modal.close(); if(callback) callback(); }
     });
+
+    Lampa.Modal.open({
+        title:'Редагування джерела',
+        html:formHtml,
+        size:'medium',
+        onBack:function(){ Lampa.Modal.close(); return true; }
+    });
+}
+
+function openAddModal(callback) {
+    var formHtml = $(`
+        <div style="padding:20px;" class="fade-in">
+            <div style="margin-bottom:15px;">
+                <label>Назва:</label>
+                <input type="text" class="modal-input add-name" placeholder="Введіть назву джерела">
+            </div>
+            <div style="margin-bottom:15px;">
+                <label>URL:</label>
+                <input type="text" class="modal-input add-url" placeholder="Введіть URL до скрипту">
+            </div>
+            <div style="display:flex; gap:10px;">
+                <div class="selector add-btn" style="flex:1; padding:10px; background:#46b85a; text-align:center; border-radius:5px; cursor:pointer;">Додати</div>
+                <div class="selector cancel-btn" style="flex:1; padding:10px; background:#555; text-align:center; border-radius:5px; cursor:pointer;">Скасувати</div>
+            </div>
+        </div>
+    `);
+
+    formHtml.find('.add-btn').on('hover:enter', function () {
+        var newName = formHtml.find('.add-name').val().trim();
+        var newUrl = formHtml.find('.add-url').val().trim();
+        if (!newName || !newUrl) { Lampa.Noty.show('Заповніть всі поля'); return; }
+        sources.push({ name:newName,url:newUrl });
+        saveSourcestoStorage();
+        hasChanges = true;
+        Lampa.Modal.close();
+        if(callback) callback();
+    });
+
+    formHtml.find('.cancel-btn').on('hover:enter', function(){ Lampa.Modal.close(); });
+
+    formHtml.find('input').on('keydown', function(e){
+        if(e.key === 'Escape') { Lampa.Modal.close(); if(callback) callback(); }
+    });
+
+    Lampa.Modal.open({
+        title:'Додавання нового джерела',
+        html:formHtml,
+        size:'medium',
+        onBack:function(){ Lampa.Modal.close(); return true; }
+    });
+}
+
+// ===== Підтвердження видалення =====
+function confirmDelete(callback) {
+    var wrapper = $('<div>Ця дія необоротна</div>');
+    Lampa.Modal.open({
+        title:'Видалити джерело?',
+        html:wrapper,
+        size:'small',
+        buttons:[
+            { name:'Так', action:function(){ Lampa.Modal.close(); callback(); }, color:'#f44336' },
+            { name:'Ні', action:function(){ Lampa.Modal.close(); }, color:'#555' }
+        ]
+    });
+}
+
+// ===== Головний модал =====
+function openSourcesModal() {
+    tempState={}; hasChanges=false;
+    var container = $('<div class="multi-container fade-in"></div>');
+    var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
+    var addBtn = $('<div class="multi-btn multi-btn-add selector">+ Додати джерело</div>');
+
+    function renderSources(){
+        container.find('.multi-item').remove();
+        sources.forEach(function(src,index){
+            var key='multi_'+src.name;
+            var current=Lampa.Storage.get(key,false);
+            tempState[key]=current;
+            var item = $(`
+                <div class="multi-item selector" data-index="${index}">
+                    <div class="multi-left">${src.name}</div>
+                    <div class="multi-right">
+                        <div class="multi-btn multi-toggle selector ${current?'enabled':'disabled'}" data-key="${key}">${current?'Увімкнено':'Вимкнено'}</div>
+                        <div class="multi-btn multi-btn-edit selector" data-index="${index}">✏️</div>
+                        <div class="multi-btn multi-btn-delete selector" data-index="${index}">🗑️</div>
+                    </div>
+                </div>
+            `);
+
+            // Toggle
+            item.find('.multi-toggle').on('hover:enter', function(){
+                var key=$(this).data('key');
+                tempState[key]=!tempState[key];
+                $(this).removeClass('enabled disabled').addClass(tempState[key]?'enabled':'disabled').text(tempState[key]?'Увімкнено':'Вимкнено');
+                hasChanges=true; applyBtn.show(); updateTitle($('.modal__title'));
+            });
+
+            // Edit
+            item.find('.multi-btn-edit').on('hover:enter', function(){ openEditModal($(this).data('index'), renderSources); });
+
+            // Delete
+            item.find('.multi-btn-delete').on('hover:enter', function(){
+                var idx=$(this).data('index');
+                confirmDelete(function(){
+                    sources.splice(idx,1);
+                    saveSourcestoStorage();
+                    hasChanges=true;
+                    renderSources(); updateTitle($('.modal__title'));
+                });
+            });
+
+            container.append(item);
+        });
+        container.append(addBtn); container.append(applyBtn);
+    }
+
+    renderSources();
+
+    addBtn.on('hover:enter', function(){ openAddModal(renderSources); });
 
     applyBtn.on('hover:enter', function(){
-        Object.keys(tempState).forEach(function(k){
-            Lampa.Storage.set(k,tempState[k]);
-        });
-        if(Lampa.Manifest && Lampa.Manifest.app_reload) Lampa.Manifest.app_reload();
+        if(!hasChanges) return;
+        Object.keys(tempState).forEach(function(k){ Lampa.Storage.set(k,tempState[k]); });
+        disableOutsideClose();
+        if(Lampa.Manifest && typeof Lampa.Manifest.app_reload==='function') Lampa.Manifest.app_reload();
         else location.reload();
     });
 
-    container.append(addBtn);
-    container.append(applyBtn);
-    wrapper.append(container);
-
-    setTimeout(function(){
-        Lampa.Controller.collectionSet(wrapper);
-        Lampa.Controller.collectionFocus(wrapper.find('.selector').first());
-    },100);
-}
-
-function renderAdd(){
-    viewMode='add';
-    wrapper.empty();
-
-    var html = $(`
-        <div class="multi-container">
-            <input class="modal-input add-name" placeholder="Назва">
-            <input class="modal-input add-url" placeholder="URL">
-            <div class="multi-btn enabled selector">Додати</div>
-            <div class="multi-btn delete selector">Назад</div>
-        </div>
-    `);
-
-    html.find('.enabled').on('hover:enter',function(){
-        var name = html.find('.add-name').val().trim();
-        var url = html.find('.add-url').val().trim();
-        if(!name||!url){ Lampa.Noty.show('Заповніть всі поля'); return;}
-        sources.push({name:name,url:url});
-        saveSources();
-        renderList();
-    });
-
-    html.find('.delete').on('hover:enter',renderList);
-
-    wrapper.append(html);
-
-    setTimeout(function(){
-        Lampa.Controller.collectionSet(wrapper);
-        Lampa.Controller.collectionFocus(wrapper.find('.selector').first());
-    },100);
-}
-
-function renderEdit(){
-    viewMode='edit';
-    wrapper.empty();
-
-    var src = sources[editIndex];
-
-    var html = $(`
-        <div class="multi-container">
-            <input class="modal-input edit-name" value="${src.name}">
-            <input class="modal-input edit-url" value="${src.url}">
-            <div class="multi-btn enabled selector">Зберегти</div>
-            <div class="multi-btn delete selector">Назад</div>
-        </div>
-    `);
-
-    html.find('.enabled').on('hover:enter',function(){
-        var name = html.find('.edit-name').val().trim();
-        var url = html.find('.edit-url').val().trim();
-        if(!name||!url){ Lampa.Noty.show('Заповніть всі поля'); return;}
-        sources[editIndex]={name:name,url:url};
-        saveSources();
-        renderList();
-    });
-
-    html.find('.delete').on('hover:enter',renderList);
-
-    wrapper.append(html);
-
-    setTimeout(function(){
-        Lampa.Controller.collectionSet(wrapper);
-        Lampa.Controller.collectionFocus(wrapper.find('.selector').first());
-    },100);
-}
-
-/* ================= MAIN MODAL ================= */
-
-function openSourcesModal(){
-
-    wrapper = $('<div></div>');
-    renderList();
-
     Lampa.Modal.open({
-        title: `Мій мультиплагін ${VERSION} — Балансери`,
-        html: wrapper,
+        title:`Мій мультиплагін ${VERSION} — Балансери`,
+        html:container,
         size:'medium',
-        onBack:function(){
-            if(viewMode!=='list'){
-                renderList();
-                return true;
-            }
-            Lampa.Modal.close();
-            Lampa.Controller.toggle('settings_component');
-            return true;
-        }
+        onBack:function(){ closeModal({ onClose:function(){ Lampa.Controller.toggle('settings_component'); }}); return true; }
     });
+
+    setTimeout(function(){
+        Lampa.Controller.collectionSet(container);
+        Lampa.Controller.collectionFocus(container.find('.selector').first());
+        enableOutsideClose(container,{ onClose:function(){ Lampa.Controller.toggle('settings_component'); }});
+        updateTitle($('.modal__title'));
+    },200);
 }
 
-/* ================= INIT ================= */
-
-function loadActive(){
+// ===== Завантаження активних джерел =====
+function loadActiveSources(){
     sources.forEach(function(src){
-        if(!Lampa.Storage.get('multi_'+src.name,false)) return;
+        var enabled=Lampa.Storage.get('multi_'+src.name,false);
+        if(!enabled) return;
         if(document.querySelector('script[src="'+src.url+'"]')) return;
-        var s=document.createElement('script');
-        s.src=src.url;
-        document.body.appendChild(s);
+        var script=document.createElement('script');
+        script.src=src.url; script.async=false;
+        document.body.appendChild(script);
     });
 }
 
-function init(){
-    var S=Lampa.SettingsApi||Lampa.Settings;
-    if(!S||!S.addComponent) return;
-
-    S.addComponent({
-        component:'multi_balancers',
-        name:`Мій мультиплагін ${VERSION}`,
-        icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-    });
-
-    S.addParam({
-        component:'multi_balancers',
-        param:{name:'multi_manage',type:'button'},
-        field:{name:'Керування балансерами'},
-        onChange:openSourcesModal
-    });
+// ===== Ініціалізація =====
+function initSettings(){
+    var SettingsApi=Lampa.SettingsApi||Lampa.Settings;
+    if(!SettingsApi||!SettingsApi.addComponent) return;
+    SettingsApi.addComponent({ component:'multi_balancers', name:`Мій мультиплагін ${VERSION}`, icon:'<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'});
+    SettingsApi.addParam({ component:'multi_balancers', param:{name:'multi_manage',type:'button'}, field:{name:'Керування балансерами'}, onChange:openSourcesModal});
 }
 
+// ===== Старт =====
 function start(){
-    injectCSS();
-    loadSources();
-    loadActive();
-    init();
+    injectCSS(); loadSourcesFromStorage(); loadActiveSources(); initSettings();
+    if(Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
+    console.log(`[MultiPlugin ${VERSION}] Loaded`);
 }
 
-if(Lampa.Listener){
-    Lampa.Listener.follow('app',function(e){
-        if(e&&e.type==='ready') start();
-    });
-}else start();
+if(Lampa.Listener) Lampa.Listener.follow('app',function(e){ if(e&&e.type==='ready') start(); });
+else start();
 
 })();
