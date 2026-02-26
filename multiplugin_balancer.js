@@ -3,7 +3,7 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v2.1';
+    const VERSION = 'v2.2';
 
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -15,7 +15,7 @@
     var tempState = {};
     var hasChanges = false;
     var outsideHandler = null;
-    var lastPluginContainer = null; // Для відновлення меню плагіну після закриття модалки
+    var pluginStack = []; // Стек меню плагіну для відновлення після модалки
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
@@ -61,10 +61,13 @@
         disableOutsideClose();
         Lampa.Modal.close();
 
-        // Відновлюємо меню плагіну після закриття модалки
-        if (lastPluginContainer && lastPluginContainer.length) {
-            Lampa.Controller.collectionSet(lastPluginContainer);
-            Lampa.Controller.collectionFocus(lastPluginContainer.find('.selector').first());
+        // Відновлення меню плагіну після закриття модалки
+        if (pluginStack.length) {
+            var last = pluginStack.pop();
+            if (last && last.length) {
+                Lampa.Controller.collectionSet(last);
+                Lampa.Controller.collectionFocus(last.find('.selector').first());
+            }
         }
     }
 
@@ -72,8 +75,9 @@
         tempState = {};
         hasChanges = false;
 
-        // Зберігаємо стан меню плагіну перед відкриттям модалки
-        lastPluginContainer = $('.settings-component[multi_balancers]');
+        // Зберігаємо стан меню плагіну у стек
+        var currentPlugin = $('.settings-component[multi_balancers]');
+        if (currentPlugin.length) pluginStack.push(currentPlugin);
 
         var container = $('<div class="multi-container"></div>');
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
