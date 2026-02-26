@@ -1,78 +1,4 @@
-(function () {
-'use strict';
-
-if (!window.Lampa) return;
-
-const VERSION = 'v4.5.3';
-
-var sources = [
-    { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
-    { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
-    { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
-    { name: "Alpac Beta", url: "http://beta.l-vid.online/online.js" }
-];
-
-var tempState = {};
-var hasChanges = false;
-var outsideHandler = null;
-
-function injectCSS() {
-    if (document.getElementById('multi-style')) return;
-
-    var style = document.createElement('style');
-    style.id = 'multi-style';
-    style.innerHTML = `
-        .multi-container { padding:15px; transition: all 0.3s ease; }
-        .multi-item { display:flex; justify-content:space-between; align-items:center; padding:10px; margin-bottom:8px; background:rgba(255,255,255,0.05); border-radius:8px; transition: all 0.3s ease; }
-        .multi-left { width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:14px; line-height:18px; }
-        .multi-right { width:60%; display:flex; justify-content:space-between; gap:5px; }
-        .multi-btn { flex:1; text-align:center; padding:8px 0; border-radius:6px; font-size:13px; cursor:pointer; color:#fff; transition: all 0.3s ease; }
-        .multi-toggle.enabled { background:#46b85a; }
-        .multi-toggle.disabled { background:#d24a4a; }
-        .multi-btn-edit { background:#FF9800; }
-        .multi-btn-delete { background:#d24a4a; }
-        .multi-btn-add { background:#156DD1; padding:10px 0; margin-top:10px; border-radius:8px; text-align:center; font-weight:bold; }
-        .multi-apply { text-align:center; margin-top:12px; padding:12px; border-radius:8px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s ease; }
-        .modal-input { background:rgba(255,255,255,0.1); border:1px solid rgba(255,255,255,0.2); color:#fff; padding:10px; border-radius:5px; margin-bottom:10px; width:100%; box-sizing:border-box; }
-        .modal-input::placeholder { color:rgba(255,255,255,0.5); }
-    `;
-    document.head.appendChild(style);
-}
-
-function updateTitle(modalTitle) {
-    if (!modalTitle) return;
-    var title = hasChanges
-        ? `Мій мультиплагін ${VERSION} — Балансери ●`
-        : `Мій мультиплагін ${VERSION} — Балансери`;
-    modalTitle.text(title);
-}
-
-function enableOutsideClose(container, modal) {
-    setTimeout(function () {
-        outsideHandler = function (e) {
-            if (!$(e.target).closest(container).length && !$(e.target).closest('.modal').length) {
-                closeModal(modal);
-            }
-        };
-        $('.modal').on('mousedown.multi', outsideHandler);
-    }, 200);
-}
-
-function disableOutsideClose() {
-    $('.modal').off('mousedown.multi');
-    outsideHandler = null;
-}
-
-function closeModal(modal) {
-    disableOutsideClose();
-    if (modal && modal.onClose) modal.onClose();
-    Lampa.Modal.close();
-}
-
-// ------------------
-// Внутрішні модалки редагування/додавання
-// ------------------
-function openEditModal(index, callback, parentOutsideHandler) {
+function openEditModal(index, callback, parentModal) {
     var src = sources[index];
     var formHtml = $(`
         <div style="padding:20px;">
@@ -91,8 +17,8 @@ function openEditModal(index, callback, parentOutsideHandler) {
         </div>
     `);
 
-    var saveBtn = formHtml.find('div').eq(2).find('.selector').first();
-    var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
+    var saveBtn = formHtml.find('.selector').first();
+    var cancelBtn = formHtml.find('.selector').last();
 
     saveBtn.on('hover:enter', function () {
         var newName = formHtml.find('.edit-name').val().trim();
@@ -104,7 +30,7 @@ function openEditModal(index, callback, parentOutsideHandler) {
         }
 
         sources[index] = { name: newName, url: newUrl };
-        Lampa.Storage.set('multi_sources', JSON.stringify(sources));
+        saveSourcestoStorage();
         hasChanges = true;
         Lampa.Modal.close();
         if (callback) callback();
@@ -120,16 +46,16 @@ function openEditModal(index, callback, parentOutsideHandler) {
         size: 'medium',
         onBack: function () {
             Lampa.Modal.close();
+            if (parentModal && parentModal.onFocus) parentModal.onFocus();
             return true;
         },
         onClose: function () {
-            // Відновлюємо зовнішній обробник головної модалки
-            if (parentOutsideHandler) $('.modal').on('mousedown.multi', parentOutsideHandler);
+            if (parentModal && parentModal.onFocus) parentModal.onFocus();
         }
     });
 }
 
-function openAddModal(callback, parentOutsideHandler) {
+function openAddModal(callback, parentModal) {
     var formHtml = $(`
         <div style="padding:20px;">
             <div style="margin-bottom:15px;">
@@ -147,8 +73,8 @@ function openAddModal(callback, parentOutsideHandler) {
         </div>
     `);
 
-    var addBtn = formHtml.find('div').eq(2).find('.selector').first();
-    var cancelBtn = formHtml.find('div').eq(2).find('.selector').last();
+    var addBtn = formHtml.find('.selector').first();
+    var cancelBtn = formHtml.find('.selector').last();
 
     addBtn.on('hover:enter', function () {
         var newName = formHtml.find('.add-name').val().trim();
@@ -160,7 +86,7 @@ function openAddModal(callback, parentOutsideHandler) {
         }
 
         sources.push({ name: newName, url: newUrl });
-        Lampa.Storage.set('multi_sources', JSON.stringify(sources));
+        saveSourcestoStorage();
         hasChanges = true;
         Lampa.Modal.close();
         if (callback) callback();
@@ -176,17 +102,15 @@ function openAddModal(callback, parentOutsideHandler) {
         size: 'medium',
         onBack: function () {
             Lampa.Modal.close();
+            if (parentModal && parentModal.onFocus) parentModal.onFocus();
             return true;
         },
         onClose: function () {
-            if (parentOutsideHandler) $('.modal').on('mousedown.multi', parentOutsideHandler);
+            if (parentModal && parentModal.onFocus) parentModal.onFocus();
         }
     });
 }
 
-// ------------------
-// Головна модалка балансерів
-// ------------------
 function openSourcesModal() {
     tempState = {};
     hasChanges = false;
@@ -214,29 +138,24 @@ function openSourcesModal() {
                 </div>
             `);
 
-            // Увімкнення/вимкнення
             item.find('.multi-toggle').on('hover:enter', function () {
                 var key = $(this).data('key');
                 tempState[key] = !tempState[key];
-                $(this)
-                    .removeClass('enabled disabled')
-                    .addClass(tempState[key] ? 'enabled' : 'disabled')
+                $(this).removeClass('enabled disabled').addClass(tempState[key] ? 'enabled' : 'disabled')
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
                 updateTitle($('.modal__title'));
             });
 
-            // Редагування
             item.find('.multi-btn-edit').on('hover:enter', function () {
-                openEditModal($(this).data('index'), renderSources, outsideHandler);
+                openEditModal($(this).data('index'), renderSources, { onFocus: function () { Lampa.Modal.update(container); } });
             });
 
-            // Видалення
             item.find('.multi-btn-delete').on('hover:enter', function () {
                 var idx = $(this).data('index');
                 sources.splice(idx, 1);
-                Lampa.Storage.set('multi_sources', JSON.stringify(sources));
+                saveSourcestoStorage();
                 hasChanges = true;
                 renderSources();
                 updateTitle($('.modal__title'));
@@ -252,18 +171,15 @@ function openSourcesModal() {
     renderSources();
 
     addBtn.on('hover:enter', function () {
-        openAddModal(renderSources, outsideHandler);
+        openAddModal(renderSources, { onFocus: function () { Lampa.Modal.update(container); } });
     });
 
     applyBtn.on('hover:enter', function () {
         if (!hasChanges) return;
-
         Object.keys(tempState).forEach(function (k) {
             Lampa.Storage.set(k, tempState[k]);
         });
-
         disableOutsideClose();
-
         if (Lampa.Manifest && typeof Lampa.Manifest.app_reload === 'function') {
             Lampa.Manifest.app_reload();
         } else {
@@ -288,59 +204,3 @@ function openSourcesModal() {
         updateTitle($('.modal__title'));
     }, 200);
 }
-
-// ------------------
-
-function loadActiveSources() {
-    sources.forEach(function (src) {
-        var enabled = Lampa.Storage.get('multi_' + src.name, false);
-        if (!enabled) return;
-        if (document.querySelector('script[src="' + src.url + '"]')) return;
-
-        var script = document.createElement('script');
-        script.src = src.url;
-        script.async = false;
-        document.body.appendChild(script);
-    });
-}
-
-function initSettings() {
-    var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
-    if (!SettingsApi || !SettingsApi.addComponent) return;
-
-    SettingsApi.addComponent({
-        component: 'multi_balancers',
-        name: `Мій мультиплагін ${VERSION}`,
-        icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
-    });
-
-    SettingsApi.addParam({
-        component: 'multi_balancers',
-        param: { name: 'multi_manage', type: 'button' },
-        field: { name: 'Керування балансерами' },
-        onChange: openSourcesModal
-    });
-}
-
-function start() {
-    injectCSS();
-    loadSourcesFromStorage();
-    loadActiveSources();
-    initSettings();
-
-    if (Lampa.Noty) {
-        Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
-    }
-
-    console.log(`[MultiPlugin ${VERSION}] Loaded`);
-}
-
-if (Lampa.Listener) {
-    Lampa.Listener.follow('app', function (e) {
-        if (e && e.type === 'ready') start();
-    });
-} else {
-    start();
-}
-
-})();
