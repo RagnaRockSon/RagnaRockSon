@@ -3,6 +3,8 @@
 
     if (!window.Lampa) return;
 
+    var VERSION = 'v1.7';
+
     var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
         { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
@@ -11,7 +13,7 @@
     ];
 
     var tempState = {};
-    var outsideHandler = null;
+    var backHandler = null;
 
     function injectCSS() {
         if (document.getElementById('multi-style')) return;
@@ -53,36 +55,29 @@
         var applyButton = $('<div class="multi-apply selector" style="display:none;">Застосувати зміни</div>');
         var backButton = $('<div class="multi-back selector">Назад</div>');
 
-        function restoreSettingsController() {
-            if (Lampa.Settings && Lampa.Settings.update) {
-                Lampa.Settings.update();
-            }
-        }
-
         function closeModal() {
-            if (outsideHandler) {
-                $(document).off('click.multiOutside', outsideHandler);
-                outsideHandler = null;
+            if (backHandler) {
+                Lampa.Controller.remove('back', backHandler);
+                backHandler = null;
             }
-
-            if (Lampa.Modal) Lampa.Modal.close();
-
-            // 🔥 ГОЛОВНЕ: повертаємо керування Settings
-            setTimeout(function(){
-                restoreSettingsController();
-            }, 50);
+            Lampa.Modal.close();
         }
 
-        outsideHandler = function (e) {
-            if (!$(e.target).closest('.multi-container').length &&
-                $(e.target).closest('.lampa-modal').length) {
-                closeModal();
-            }
-        };
+        // ONE CLICK ПО OVERLAY
+        setTimeout(function () {
+            $('.lampa-modal').off('click.multiOverlay').on('click.multiOverlay', function (e) {
+                if ($(e.target).hasClass('lampa-modal')) {
+                    closeModal();
+                }
+            });
+        }, 100);
 
-        setTimeout(function(){
-            $(document).on('click.multiOutside', outsideHandler);
-        },100);
+        // BACK З ПУЛЬТА
+        backHandler = function () {
+            closeModal();
+            return true;
+        };
+        Lampa.Controller.add('back', backHandler);
 
         sources.forEach(function (src) {
 
@@ -100,6 +95,7 @@
             `);
 
             item.on('hover:enter', function () {
+_attach
                 tempState[key] = !tempState[key];
 
                 item.find('.multi-toggle')
@@ -134,16 +130,14 @@
         container.append(applyButton).append(backButton);
 
         Lampa.Modal.open({
-            title: 'Мій мультиплагін v1.6 — Балансери',
+            title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
             html: container
         });
 
-        setTimeout(function(){
-            if (Lampa.Controller) {
-                Lampa.Controller.collectionSet(container);
-                Lampa.Controller.collectionFocus(container.find('.selector').first());
-            }
-        },100);
+        setTimeout(function () {
+            Lampa.Controller.collectionSet(container);
+            Lampa.Controller.collectionFocus(container.find('.selector').first());
+        }, 100);
     }
 
     function initSettings() {
@@ -153,7 +147,7 @@
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
-            name: 'Мій мультиплагін v1.6',
+            name: 'Мій мультиплагін ' + VERSION,
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
@@ -169,6 +163,13 @@
         injectCSS();
         loadActiveSources();
         initSettings();
+
+        // ПОВІДОМЛЕННЯ ПРИ СТАРТІ
+        if (Lampa.Noty) {
+            Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
+        }
+
+        console.log('[MultiPlugin ' + VERSION + '] Loaded');
     }
 
     if (Lampa.Listener) {
