@@ -1,22 +1,83 @@
 (function () {
 
+    'use strict';
+
     var plugin_version = '4.5.6';
-
-    if (!window.Lampa) return;
-
-    var SOURCES_KEY = 'multi_balancer_sources';
-    var sources = Lampa.Storage.get(SOURCES_KEY, []);
-
-    var hasChanges = false;
+    var sources = Lampa.Storage.get('multi_sources', []);
     var tempState = {};
+    var hasChanges = false;
 
-    function saveSources() {
-        Lampa.Storage.set(SOURCES_KEY, sources);
+    function saveSourcestoStorage() {
+        Lampa.Storage.set('multi_sources', sources);
+    }
+
+    function openAddModal(callback) {
+
+        var input = $('<input type="text" class="settings-input" placeholder="Назва джерела">');
+
+        Lampa.Modal.open({
+            title: 'Додати джерело',
+            html: $('<div>').append(input),
+            size: 'small',
+            onBack: function () {
+                Lampa.Modal.close();
+            },
+            buttons: [
+                {
+                    name: 'Додати',
+                    onSelect: function () {
+                        var value = input.val().trim();
+                        if (!value) return;
+
+                        sources.push({ name: value });
+                        saveSourcestoStorage();
+                        Lampa.Modal.close();
+                        callback();
+                    }
+                }
+            ]
+        });
+    }
+
+    function openEditModal(index, callback) {
+
+        var input = $('<input type="text" class="settings-input">');
+        input.val(sources[index].name);
+
+        Lampa.Modal.open({
+            title: 'Редагувати джерело',
+            html: $('<div>').append(input),
+            size: 'small',
+            onBack: function () {
+                Lampa.Modal.close();
+            },
+            buttons: [
+                {
+                    name: 'Зберегти',
+                    onSelect: function () {
+                        var value = input.val().trim();
+                        if (!value) return;
+
+                        sources[index].name = value;
+                        saveSourcestoStorage();
+                        Lampa.Modal.close();
+                        callback();
+                    }
+                }
+            ]
+        });
     }
 
     function openMainModal() {
 
         var container = $('<div class="multi-container"></div>');
+        var applyBtn = $('<div class="multi-btn multi-btn-apply selector">Застосувати</div>');
+        applyBtn.hide();
+
+        function updateTitle(titleElement) {
+            if (!titleElement) return;
+            titleElement.text('Балансери v' + plugin_version + (hasChanges ? ' *' : ''));
+        }
 
         function renderSources() {
 
@@ -35,12 +96,13 @@
                             <div class="multi-btn multi-toggle ${current ? 'enabled':'disabled'} selector">
                                 ${current ? 'Увімкнено':'Вимкнено'}
                             </div>
-                            <div class="multi-btn multi-edit selector">Редагувати</div>
-                            <div class="multi-btn multi-delete selector">Видалити</div>
+                            <div class="multi-btn multi-edit selector">✏️</div>
+                            <div class="multi-btn multi-delete selector">🗑️</div>
                         </div>
                     </div>
                 `);
 
+                // Toggle
                 row.find('.multi-toggle').on('hover:enter click', function () {
 
                     tempState[key] = !tempState[key];
@@ -51,40 +113,61 @@
                         .text(tempState[key] ? 'Увімкнено':'Вимкнено');
 
                     hasChanges = true;
+                    applyBtn.show();
+                    updateTitle($('.modal__title'));
                 });
 
+                // Edit
                 row.find('.multi-edit').on('hover:enter click', function () {
                     openEditModal(index, renderSources);
                 });
 
+                // Delete
                 row.find('.multi-delete').on('hover:enter click', function () {
                     sources.splice(index, 1);
-                    saveSources();
+                    saveSourcestoStorage();
+                    hasChanges = true;
                     renderSources();
+                    updateTitle($('.modal__title'));
                 });
 
                 container.append(row);
             });
 
-            var addBtn = $('<div class="multi-btn multi-add selector">+ Додати джерело</div>');
-
+            var addBtn = $('<div class="multi-btn multi-btn-add selector">+ Додати джерело</div>');
             addBtn.on('hover:enter click', function () {
                 openAddModal(renderSources);
             });
 
             container.append(addBtn);
 
+            // 🔥 КЛЮЧОВЕ ВИПРАВЛЕННЯ 4.5.6
             setTimeout(function () {
                 Lampa.Controller.collectionSet(container);
-                Lampa.Controller.collectionFocus(container.find('.selector').first());
+                Lampa.Controller.collectionFocus(
+                    container.find('.selector').first()
+                );
             }, 50);
         }
+
+        applyBtn.on('hover:enter click', function () {
+
+            Object.keys(tempState).forEach(function (key) {
+                Lampa.Storage.set(key, tempState[key]);
+            });
+
+            hasChanges = false;
+            applyBtn.hide();
+            updateTitle($('.modal__title'));
+
+            Lampa.Noty.show('Зміни збережено');
+        });
 
         renderSources();
 
         Lampa.Modal.open({
-            title: 'Multi Balancer',
-            html: container,
+            title: 'Балансери v' + plugin_version,
+            html: $('<div>').append(container).append(applyBtn),
             size: 'medium',
             onBack: function () {
                 Lampa.Modal.close();
@@ -93,146 +176,32 @@
         });
     }
 
-    function openAddModal(callback) {
+    function init() {
 
-        var input = $('<input type="text" placeholder="Назва джерела" class="multi-input">');
+        Lampa.SettingsApi.addComponent({
+            component: 'multi_balancer',
+            name: 'Multi Balancer',
+            icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
+        });
 
-        var wrapper = $('<div class="multi-form"></div>');
-        wrapper.append(input);
-
-        Lampa.Modal.open({
-            title: 'Додати джерело',
-            html: wrapper,
-            size: 'small',
-            onBack: function () {
-                Lampa.Modal.close();
+        Lampa.SettingsApi.addParam({
+            component: 'multi_balancer',
+            param: {
+                name: 'multi_balancer_open',
+                type: 'button'
             },
-            onSelect: function () {
-                var value = input.val().trim();
-                if (!value) return;
-
-                sources.push({ name: value });
-                saveSources();
-
-                Lampa.Modal.close();
-                callback();
+            field: {
+                name: 'Відкрити балансери'
+            },
+            onChange: function () {
+                openMainModal();
             }
         });
     }
 
-    function openEditModal(index, callback) {
-
-        var input = $('<input type="text" class="multi-input">');
-        input.val(sources[index].name);
-
-        var wrapper = $('<div class="multi-form"></div>');
-        wrapper.append(input);
-
-        Lampa.Modal.open({
-            title: 'Редагувати джерело',
-            html: wrapper,
-            size: 'small',
-            onBack: function () {
-                Lampa.Modal.close();
-            },
-            onSelect: function () {
-                var value = input.val().trim();
-                if (!value) return;
-
-                sources[index].name = value;
-                saveSources();
-
-                Lampa.Modal.close();
-                callback();
-            }
-        });
-    }
-
-    Lampa.SettingsApi.addComponent({
-        component: 'multi_balancer',
-        name: 'Multi Balancer',
-        icon: '🧩'
+    if (window.appready) init();
+    else Lampa.Listener.follow('app', function (e) {
+        if (e.type === 'ready') init();
     });
-
-    Lampa.SettingsApi.addParam({
-        component: 'multi_balancer',
-        param: {
-            name: 'multi_balancer_open',
-            type: 'button'
-        },
-        field: {
-            name: 'Налаштування балансерів'
-        },
-        onChange: function () {
-            openMainModal();
-        }
-    });
-
-    Lampa.CSS.add(`
-        .multi-container{
-            padding:20px;
-        }
-
-        .multi-item{
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-            margin-bottom:12px;
-        }
-
-        .multi-left{
-            width:40%;
-            font-size:18px;
-            overflow:hidden;
-            text-overflow:ellipsis;
-        }
-
-        .multi-right{
-            width:60%;
-            display:flex;
-            justify-content:space-between;
-            align-items:center;
-        }
-
-        .multi-btn{
-            flex:1;
-            margin:0 4px;
-            height:38px;
-            border-radius:8px;
-            display:flex;
-            justify-content:center;
-            align-items:center;
-            font-size:14px;
-            cursor:pointer;
-        }
-
-        .multi-toggle.enabled{
-            background:#2ecc71;
-        }
-
-        .multi-toggle.disabled{
-            background:#e74c3c;
-        }
-
-        .multi-edit{
-            background:#3498db;
-        }
-
-        .multi-delete{
-            background:#9b59b6;
-        }
-
-        .multi-add{
-            margin-top:20px;
-            background:#f39c12;
-        }
-
-        .multi-input{
-            width:100%;
-            height:40px;
-            padding:10px;
-            font-size:16px;
-        }
-    `);
 
 })();
