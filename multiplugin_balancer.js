@@ -3,7 +3,7 @@
 
 if (!window.Lampa) return;
 
-const VERSION = 'v4.4.9';
+const VERSION = 'v4.5.0';
 
 var sources = [
     { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
@@ -23,10 +23,10 @@ function injectCSS() {
     style.id = 'multi-style';
     style.innerHTML = `
         .multi-container { padding:20px; transition: all 0.3s ease; }
-        .multi-item { display:flex; align-items:center; justify-content:space-between; padding:12px 10px; margin-bottom:10px; border-radius:10px; background:rgba(255,255,255,0.05); }
-        .multi-left { flex:1; margin-right:10px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:16px; }
-        .multi-right { display:flex; gap:8px; flex-shrink:0; }
-        .multi-btn { min-width:70px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:14px; cursor:pointer; color:#fff; }
+        .multi-item { display:flex; align-items:center; justify-content:space-between; padding:10px; margin-bottom:10px; border-radius:10px; background:rgba(255,255,255,0.05); }
+        .multi-left { width:40%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-size:16px; }
+        .multi-right { width:60%; display:flex; justify-content:space-around; flex-shrink:0; }
+        .multi-btn { flex:1; margin:0 4px; height:36px; display:flex; align-items:center; justify-content:center; border-radius:10px; font-size:14px; cursor:pointer; color:#fff; }
         .multi-toggle.enabled { background:#46b85a; }
         .multi-toggle.disabled { background:#d24a4a; }
         .multi-btn-edit { background:#FF9800; }
@@ -163,14 +163,13 @@ function openSourcesModal() {
                 <div class="multi-item selector" data-index="${index}">
                     <div class="multi-left">${src.name}</div>
                     <div class="multi-right">
-                        <div class="multi-btn multi-toggle ${current?'enabled':'disabled'}" data-key="${key}">${current?'Увімкнено':'Вимкнено'}</div>
+                        <div class="multi-btn multi-toggle ${current?'enabled':'disabled'}" data-key="${key}"> ${current?'Увімкнено':'Вимкнено'} </div>
                         <div class="multi-btn multi-btn-edit selector" data-index="${index}">✏️</div>
                         <div class="multi-btn multi-btn-delete selector" data-index="${index}">🗑️</div>
                     </div>
                 </div>
             `);
 
-            // Toggle works like edit/delete
             item.find('.multi-toggle').on('hover:enter', function(){
                 var key = $(this).data('key');
                 tempState[key] = !tempState[key];
