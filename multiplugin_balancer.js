@@ -3,9 +3,8 @@
 
     if (!window.Lampa) return;
 
-    const VERSION = 'v4.1';
-
-    var defaultSources = [
+    const VERSION = 'v4.1.1';
+    var sources = [
         { name: "BazaNetUa", url: "http://lampaua.mooo.com/online.js" },
         { name: "BanderaOnline", url: "https://lampame.github.io/main/BanderaOnline/BanderaOnline.js" },
         { name: "Online_mod", url: "https://nb557.github.io/plugins/online_mod.js" },
@@ -21,33 +20,29 @@
         var style = document.createElement('style');
         style.id = 'multi-style';
         style.innerHTML = `
-            .multi-container { padding:20px; transition: all 0.3s ease; }
-            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition:0.3s; }
-            .multi-item.focus { background:rgba(255,255,255,0.1); transform:scale(1.02); }
-            .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; cursor:pointer; transition: all 0.3s; }
+            .multi-container { padding:20px; transition: all 0.25s ease; }
+            .multi-item { display:flex; justify-content:space-between; align-items:center; padding:15px; margin-bottom:10px; background:rgba(255,255,255,0.05); border-radius:10px; transition: all 0.25s ease; }
+            .multi-item.focus { transform: scale(1.02); background: rgba(255,255,255,0.1); }
+            .multi-toggle { padding:6px 14px; border-radius:20px; min-width:120px; text-align:center; color:#fff; cursor:pointer; transition: all 0.3s ease; }
             .multi-toggle.enabled { background:#46b85a; }
             .multi-toggle.disabled { background:#d24a4a; }
-            .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; transition: all 0.3s; }
-            .multi-edit-container { display:flex; flex-direction:column; gap:10px; margin-top:10px; }
-            .multi-edit-row { display:flex; gap:10px; align-items:center; }
-            .multi-edit-row input { flex:1; padding:5px 8px; border-radius:6px; border:1px solid #ccc; }
-            .multi-edit-row button { padding:5px 10px; cursor:pointer; border:none; border-radius:6px; background:#156DD1; color:#fff; transition: 0.3s; }
-            .multi-edit-row button:hover { background:#1f82ff; }
+            .multi-apply { text-align:center; margin-top:20px; padding:15px; border-radius:10px; font-weight:bold; cursor:pointer; background:#156DD1; color:#fff; display:none; }
+            .multi-apply:hover { transform:scale(1.03); background:#1f82ff; }
         `;
         document.head.appendChild(style);
     }
 
-    function updateTitle(modal) {
+    function updateTitle() {
         var title = hasChanges
-            ? `Мій мультиплагін ${VERSION} ●`
-            : `Мій мультиплагін ${VERSION}`;
-        if (modal && modal.find('.modal__title').length) modal.find('.modal__title').text(title);
+            ? 'Мій мультиплагін ' + VERSION + ' — Балансери ●'
+            : 'Мій мультиплагін ' + VERSION + ' — Балансери';
+        $('.modal__title').text(title);
     }
 
     function enableOutsideClose(container) {
         setTimeout(function () {
             outsideHandler = function (e) {
-                if (!$(e.target).closest(container).length) {
+                if (!$(e.target).closest('.multi-container').length) {
                     closeModal();
                 }
             };
@@ -65,37 +60,28 @@
         Lampa.Modal.close();
     }
 
-    function loadActiveSources() {
-        var customSources = Lampa.Storage.get('multi_sources_custom', []);
-        var allSources = defaultSources.concat(customSources);
-
-        allSources.forEach(function (src) {
-            var enabled = Lampa.Storage.get('multi_' + src.name, false);
-            if (!enabled) return;
-            if (document.querySelector('script[src="' + src.url + '"]')) return;
-
-            var script = document.createElement('script');
-            script.src = src.url;
-            script.async = false;
-            document.body.appendChild(script);
-        });
+    // --- Функція чекання контейнера для collectionFocus ---
+    function waitForContainer(container, callback) {
+        var tries = 0;
+        var interval = setInterval(function() {
+            if (container && container.length && container.find('.selector').length) {
+                clearInterval(interval);
+                callback();
+            } else if (tries++ > 20) { // максимум 20 спроб
+                clearInterval(interval);
+                console.warn('MultiPlugin: container not found for collectionFocus');
+            }
+        }, 50);
     }
 
-    // =======================
-    // Модалка Балансерів
-    // =======================
     function openSourcesModal() {
-
         tempState = {};
         hasChanges = false;
 
         var container = $('<div class="multi-container"></div>');
         var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
 
-        var customSources = Lampa.Storage.get('multi_sources_custom', []);
-        var allSources = defaultSources.concat(customSources);
-
-        allSources.forEach(function (src) {
+        sources.forEach(function (src) {
             var key = 'multi_' + src.name;
             var current = Lampa.Storage.get(key, false);
             tempState[key] = current;
@@ -117,7 +103,7 @@
                     .text(tempState[key] ? 'Увімкнено' : 'Вимкнено');
                 hasChanges = true;
                 applyBtn.show();
-                updateTitle(container);
+                updateTitle();
             });
 
             container.append(item);
@@ -139,7 +125,7 @@
         container.append(applyBtn);
 
         Lampa.Modal.open({
-            title: `Мій мультиплагін ${VERSION} — Балансери`,
+            title: 'Мій мультиплагін ' + VERSION + ' — Балансери',
             html: container,
             onBack: function () {
                 closeModal();
@@ -147,103 +133,35 @@
             }
         });
 
-        setTimeout(function () {
+        // --- чекати контейнер перед collectionFocus ---
+        waitForContainer(container, function() {
             Lampa.Controller.collectionSet(container);
             Lampa.Controller.collectionFocus(container.find('.selector').first());
             enableOutsideClose(container);
-            updateTitle(container);
-        }, 200);
+            updateTitle();
+        });
     }
 
-    // =======================
-    // Модалка редагування джерел
-    // =======================
-    function openEditSourcesModal() {
+    function loadActiveSources() {
+        sources.forEach(function (src) {
+            var enabled = Lampa.Storage.get('multi_' + src.name, false);
+            if (!enabled) return;
+            if (document.querySelector('script[src="' + src.url + '"]')) return;
 
-        var container = $('<div class="multi-container"></div>');
-        var editWrapper = $('<div class="multi-edit-container"></div>');
-
-        var customSources = Lampa.Storage.get('multi_sources_custom', []);
-
-        function renderEditRows() {
-            editWrapper.empty();
-            customSources.forEach(function (src, index) {
-                var row = $(`
-                    <div class="multi-edit-row selector">
-                        <input type="text" value="${src.name}" placeholder="Назва" />
-                        <input type="text" value="${src.url}" placeholder="URL" />
-                        <button class="delete">Видалити</button>
-                    </div>
-                `);
-
-                row.find('input').on('input', function () {
-                    hasChanges = true;
-                    updateTitle(container);
-                });
-
-                row.find('.delete').on('hover:enter', function () {
-                    customSources.splice(index, 1);
-                    renderEditRows();
-                    hasChanges = true;
-                    updateTitle(container);
-                });
-
-                editWrapper.append(row);
-            });
-        }
-
-        renderEditRows();
-
-        var addButton = $('<div class="multi-apply selector">Додати джерело</div>');
-        addButton.on('hover:enter', function () {
-            customSources.push({ name: '', url: '' });
-            renderEditRows();
-            hasChanges = true;
-            updateTitle(container);
+            var script = document.createElement('script');
+            script.src = src.url;
+            script.async = false;
+            document.body.appendChild(script);
         });
-
-        var applyBtn = $('<div class="multi-apply selector">Застосувати зміни</div>');
-        applyBtn.on('hover:enter', function () {
-            // Зберігаємо всі джерела
-            var validSources = [];
-            editWrapper.find('.multi-edit-row').each(function () {
-                var name = $(this).find('input').eq(0).val().trim();
-                var url = $(this).find('input').eq(1).val().trim();
-                if (name && url) validSources.push({ name, url });
-            });
-            Lampa.Storage.set('multi_sources_custom', validSources);
-            closeModal();
-        });
-
-        container.append(addButton).append(editWrapper).append(applyBtn);
-
-        Lampa.Modal.open({
-            title: `Мій мультиплагін ${VERSION} — Редагування джерел`,
-            html: container,
-            onBack: function () {
-                closeModal();
-                return true;
-            }
-        });
-
-        setTimeout(function () {
-            Lampa.Controller.collectionSet(container);
-            Lampa.Controller.collectionFocus(container.find('.selector').first());
-            enableOutsideClose(container);
-            updateTitle(container);
-        }, 200);
     }
 
-    // =======================
-    // Налаштування меню плагіну
-    // =======================
     function initSettings() {
         var SettingsApi = Lampa.SettingsApi || Lampa.Settings;
         if (!SettingsApi || !SettingsApi.addComponent) return;
 
         SettingsApi.addComponent({
             component: 'multi_balancers',
-            name: `Мій мультиплагін ${VERSION}`,
+            name: 'Мій мультиплагін ' + VERSION,
             icon: '<svg viewBox="0 0 24 24" fill="currentColor"><circle cx="12" cy="12" r="10"/></svg>'
         });
 
@@ -253,21 +171,14 @@
             field: { name: 'Керування балансерами' },
             onChange: openSourcesModal
         });
-
-        SettingsApi.addParam({
-            component: 'multi_balancers',
-            param: { name: 'multi_edit_sources', type: 'button' },
-            field: { name: 'Редагувати джерела' },
-            onChange: openEditSourcesModal
-        });
     }
 
     function start() {
         injectCSS();
         loadActiveSources();
         initSettings();
-        if (Lampa.Noty) Lampa.Noty.show(`Мій мультиплагін ${VERSION} завантажено`);
-        console.log(`[MultiPlugin ${VERSION}] Loaded`);
+        if (Lampa.Noty) Lampa.Noty.show('Мій мультиплагін ' + VERSION + ' завантажено');
+        console.log('[MultiPlugin ' + VERSION + '] Loaded');
     }
 
     if (Lampa.Listener) {
