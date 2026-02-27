@@ -63,70 +63,94 @@
     // ─────────────────────────────────────────────────────────────────
 
     var LogoEngine = {
-        _cachePrefix: 'nfx_logo_v7_',
+    _cachePrefix: 'nfx_logo_v7_',
 
-        _key: function (type, id, lang) {
-            return this._cachePrefix + type + '_' + id + '_' + lang;
-        },
+    _key: function (type, id, lang) {
+        return this._cachePrefix + type + '_' + id + '_' + lang;
+    },
 
-        _getCached: function (key) {
-            try {
-                var s = sessionStorage.getItem(key);
-                if (s) return s;
-            } catch (e) { /* ignore */ }
-            return Lampa.Storage.get(key, null);
-        },
+    _getCached: function (key) {
+        try {
+            var s = sessionStorage.getItem(key);
+            if (s) return s;
+        } catch (e) { /* ignore */ }
+        return Lampa.Storage.get(key, null);
+    },
 
-        _setCached: function (key, value) {
-            var v = value || 'none';
-            try { sessionStorage.setItem(key, v); } catch (e) { /* ignore */ }
-            Lampa.Storage.set(key, v);
-        },
+    _setCached: function (key, value) {
+        var v = value || 'none';
+        try { sessionStorage.setItem(key, v); } catch (e) { /* ignore */ }
+        Lampa.Storage.set(key, v);
+    },
 
-        /**
-         * Pick best logo: target_lang PNG → en PNG → any first.
-         * SVGs converted to PNG via extension swap.
-         */
-        _pickBest: function (logos, targetLang) {
-    if (!logos || !logos.length) return null;
+    _pickBest: function (logos, targetLang) {
+        if (!logos || !logos.length) return null;
 
-    var sorted = logos.slice().sort(function (a, b) {
-        var aS = (a.file_path || '').toLowerCase().endsWith('.svg');
-        var bS = (b.file_path || '').toLowerCase().endsWith('.svg');
-        return aS === bS ? 0 : (aS ? 1 : -1);
-    });
+        var sorted = logos.slice().sort(function (a, b) {
+            var aS = (a.file_path || '').toLowerCase().endsWith('.svg');
+            var bS = (b.file_path || '').toLowerCase().endsWith('.svg');
+            return aS === bS ? 0 : (aS ? 1 : -1);
+        });
 
-    var ukLogo = null;
-    var enLogo = null;
+        var ukLogo = null;
+        var enLogo = null;
 
-    for (var i = 0; i < sorted.length; i++) {
-        if (!sorted[i].file_path) continue;
+        for (var i = 0; i < sorted.length; i++) {
+            if (!sorted[i].file_path) continue;
 
-        if (sorted[i].iso_639_1 === 'uk')
-            ukLogo = sorted[i].file_path;
+            if (sorted[i].iso_639_1 === 'uk')
+                ukLogo = sorted[i].file_path;
 
-        if (sorted[i].iso_639_1 === 'en')
-            enLogo = sorted[i].file_path;
+            if (sorted[i].iso_639_1 === 'en')
+                enLogo = sorted[i].file_path;
+        }
+
+        if (ukLogo) return ukLogo;
+        if (enLogo) return { en: enLogo };
+        return null;
+    },
+
+    _getLang: function () {
+        var manual = Lampa.Storage.get('nfx_logo_lang', 'auto');
+        if (manual && manual !== 'auto') return manual;
+        var u = Lampa.Storage.get('logo_lang', '');
+        return u || Lampa.Storage.get('language', 'uk') || 'uk';
+    },
+
+    resolve: function (movie, done) {
+        if (!movie || !movie.id) { done(null); return; }
+
+        var type = movie.name ? 'tv' : 'movie';
+        var lang = this._getLang();
+        var cacheKey = this._key(type, movie.id, lang);
+
+        var cached = this._getCached(cacheKey);
+        if (cached === 'none') { done(null); return; }
+        if (cached) { done(cached); return; }
+
+        var url = Lampa.TMDB.api(
+            type + '/' + movie.id + '/images?api_key=' + Lampa.TMDB.key() +
+            '&include_image_language=' + lang + ',ru,en,null'
+        );
+
+        var self = this;
+        var size = Lampa.Storage.get('logo_size', 'original') || 'original';
+
+        $.get(url, function (data_api) {
+            var path = self._pickBest(data_api.logos, lang);
+            if (path) {
+                var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
+                self._setCached(cacheKey, imgUrl);
+                done(imgUrl);
+            } else {
+                self._setCached(cacheKey, 'none');
+                done(null);
+            }
+        }).fail(function () {
+            done(null);
+        });
     }
-
-    if (ukLogo) return ukLogo;
-
-    // якщо немає uk, але є en — повертаємо спеціальний маркер
-    if (enLogo) return { en: enLogo };
-
-    return null;
- },
-
-    // інші методи LogoEngine тут…
 };
-            
-        _getLang: function () {
-            var manual = Lampa.Storage.get('nfx_logo_lang', 'auto');
-            if (manual && manual !== 'auto') return manual;
-            var u = Lampa.Storage.get('logo_lang', '');
-            return u || Lampa.Storage.get('language', 'uk') || 'uk';
-        },
-
         /**
          * Resolve logo — uses Lampa.TMDB.api() + Lampa.TMDB.key()
          */
