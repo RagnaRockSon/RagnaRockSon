@@ -1,6 +1,12 @@
 (function () {
     'use strict';
 
+    // ✨ Завантажуємо Tesseract.js для OCR
+    var script = document.createElement('script');
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
+    script.async = true;
+    document.head.appendChild(script);
+
     var isExoticOS = /Vidaa|Web0S|Tizen|SmartTV|Metrological|NetCast/i.test(navigator.userAgent);
 
     /* ================================================================
@@ -59,6 +65,144 @@
 
 
     // ─────────────────────────────────────────────────────────────────
+    //  SECTION 2.5 — LOGO TRANSLATOR  (OCR + Canvas)
+    // ─────────────────────────────────────────────────────────────────
+
+    var LogoTranslator = {
+        _translationCache: {},
+        
+        _cacheKey: function(text) {
+            return 'nfx_logo_trans_' + text.toLowerCase().replace(/\s+/g, '_');
+        },
+        
+        // Переклад текстуliterally (MyMemory API)
+        _translateText: function(text, callback) {
+            var cacheKey = this._cacheKey(text);
+            
+            try {
+                var cached = sessionStorage.getItem(cacheKey);
+                if (cached) {
+                    callback(cached);
+                    return;
+                }
+            } catch (e) {}
+            
+            var encodedText = encodeURIComponent(text);
+            var url = 'https://api.mymemory.translated.net/get?q=' + encodedText + '&langpair=en|uk';
+            
+            if (typeof $ !== 'undefined' && $.get) {
+                $.get(url, function(response) {
+                    if (response && response.responseData && response.responseData.translatedText) {
+                        var translated = response.responseData.translatedText;
+                        try {
+                            sessionStorage.setItem(cacheKey, translated);
+                        } catch (e) {}
+                        callback(translated);
+                    } else {
+                        callback(text);
+                    }
+                }).fail(function() {
+                    callback(text);
+                });
+            } else {
+                fetch(url)
+                    .then(function(r) { return r.json(); })
+                    .then(function(data) {
+                        var trans = data.responseData.translatedText || text;
+                        try {
+                            sessionStorage.setItem(cacheKey, trans);
+                        } catch (e) {}
+                        callback(trans);
+                    })
+                    .catch(function() { callback(text); });
+            }
+        },
+        
+        // Завантажити логотип та перекласти його
+        processLogoForTranslation: function(logoUrl, callback) {
+            // ✨ Завантажуємо картинку
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            img.onload = function() {
+                // ✨ Завантажуємо Tesseract для розпізнавання тексту
+                if (typeof Tesseract === 'undefined') {
+                    // Якщо Tesseract не завантажено — просто показуємо оригіналу логотип
+                    console.log('[NFX] Tesseract not available, using original logo');
+                    callback(logoUrl);
+                    return;
+                }
+                
+                // ✨ Розпізнаємо текст у логотипі (OCR)
+                Tesseract.recognize(img, 'rus+eng').then(function(result) {
+                    var extractedText = result.data.text.trim();
+                    
+                    if (!extractedText || extractedText.length < 2) {
+                        // Якщо не вдалось розпізнати текст — показуємо оригіналу
+                        console.log('[NFX] No text detected in logo');
+                        callback(logoUrl);
+                        return;
+                    }
+                    
+                    console.log('[NFX] Extracted text:', extractedText);
+                    
+                    // ✨ Перекладаємо витягнений текст
+                    LogoTranslator._translateText(extractedText, function(translatedText) {
+                        console.log('[NFX] Translated text:', translatedText);
+                        
+                        // ✨ Замінюємо текст у логотипі за допомогою Canvas
+                        var newLogoUrl = LogoTranslator._replaceTextInLogo(img, extractedText, translatedText);
+                        callback(newLogoUrl);
+                    });
+                }).catch(function(err) {
+                    console.log('[NFX] OCR error:', err);
+                    callback(logoUrl);  // Fallback на оригіналу
+                });
+            };
+            img.onerror = function() {
+                console.log('[NFX] Failed to load logo image');
+                callback(logoUrl);  // Fallback на оригіналу
+            };
+            img.src = logoUrl;
+        },
+        
+        // Замінити текст у логотипі за допомогою Canvas
+        _replaceTextInLogo: function(img, oldText, newText) {
+            try {
+                // ✨ Створюємо Canvas з розмірами логотипу
+                var canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                var ctx = canvas.getContext('2d');
+                
+                // ✨ Малюємо оригіналу картинку
+                ctx.drawImage(img, 0, 0);
+                
+                // ✨ Замінюємо текст
+                // Це складна операція — потрібно:
+                // 1. Знайти позицію тексту
+                // 2. Стерти старий текст
+                // 3. Написати новий текст
+                
+                // Спрощений варіант — просто додаємо український текст
+                ctx.font = '48px Arial, sans-serif';
+                ctx.fillStyle = '#ffffff';
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Малюємо переклад у центр
+                ctx.fillText(newText, canvas.width / 2, canvas.height / 2);
+                
+                // ✨ Повертаємо нову картинку як Data URL
+                return canvas.toDataURL('image/png');
+            } catch (e) {
+                console.log('[NFX] Canvas error:', e);
+                return null;  // Не вдалось обробити
+            }
+        }
+    };
+
+    // ─────────────────────────────────────────────────────────────────
     //  SECTION 2 — LOGO ENGINE  (NO hardcoded API keys)
     // ─────────────────────────────────────────────────────────────────
 
@@ -84,11 +228,10 @@
         },
 
         /**
-         * Pick best logo: target_lang PNG → en PNG → any first.
+         * Pick best logo: UK → EN → RU (but EN/RU need translation)
          * SVGs converted to PNG via extension swap.
-         * ✨ NEW: Якщо немає UK логотипу, намагаємось перекласти назву на українську
          */
-        _pickBest: function (logos, targetLang, movieData) {
+        _pickBest: function (logos, targetLang) {
             if (!logos || !logos.length) return null;
 
             var sorted = logos.slice().sort(function (a, b) {
@@ -97,40 +240,40 @@
                 return aS === bS ? 0 : (aS ? 1 : -1);
             });
 
-            // 1. Direct match (шукаємо потрібну мову)
+            // 1. Шукаємо українське (uk)
             for (var i = 0; i < sorted.length; i++) {
-                if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) return sorted[i].file_path;
+                if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) {
+                    return sorted[i].file_path;  // Повертаємо як строка (немає перекладу потрібен)
+                }
             }
 
-            // 2. Ukrainian Fallback -> Russian (якщо шукаємо українське, пробуємо російське)
+            // 2. Якщо шукаємо українське, але немає — шукаємо англійське
             if (targetLang === 'uk' || targetLang === 'ua') {
+                for (var j = 0; j < sorted.length; j++) {
+                    if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) {
+                        // ✨ Повертаємо ОБЪЕКТ з флагом перекладу (англійське)
+                        return {
+                            path: sorted[j].file_path,
+                            needsTranslation: true,
+                            sourceLanguage: 'en'
+                        };
+                    }
+                }
+                
+                // 3. Тільки якщо немає англійського — використовуємо російське для перекладу
                 for (var r = 0; r < sorted.length; r++) {
                     if (sorted[r].iso_639_1 === 'ru' && sorted[r].file_path) {
-                        // ✨ НОВЕ: Повертаємо російське лого з флагом що потрібен переклад
+                        // ✨ Повертаємо ОБЪЕКТ з флагом перекладу (російське)
                         return {
-                            url: sorted[r].file_path,
+                            path: sorted[r].file_path,
                             needsTranslation: true,
-                            sourceLanguage: 'ru',
-                            movieData: movieData
+                            sourceLanguage: 'ru'
                         };
                     }
                 }
             }
 
-            // 3. Fallback -> English (якщо нічого не знайшли, пробуємо англійське)
-            for (var j = 0; j < sorted.length; j++) {
-                if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) {
-                    // ✨ НОВЕ: Повертаємо англійське лого з флагом що потрібен переклад
-                    return {
-                        url: sorted[j].file_path,
-                        needsTranslation: true,
-                        sourceLanguage: 'en',
-                        movieData: movieData
-                    };
-                }
-            }
-
-            // 4. Any
+            // 4. Будь-яке інше (без перекладу)
             return sorted[0] && sorted[0].file_path ? sorted[0].file_path : null;
         },
 
@@ -164,25 +307,28 @@
             var size = Lampa.Storage.get('logo_size', 'original') || 'original';
 
             $.get(url, function (data_api) {
-                // ✨ НОВЕ: Передаємо movie у _pickBest
-                var path = self._pickBest(data_api.logos, lang, movie);
-                
+                var path = self._pickBest(data_api.logos, lang);
                 if (path) {
                     // ✨ НОВЕ: Перевіряємо чи це об'єкт з флагом needsTranslation
                     if (typeof path === 'object' && path.needsTranslation) {
-                        // Це російське або англійське лого - потрібен переклад назви
-                        var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.url.replace('.svg', '.png'));
-                        self._setCached(cacheKey, imgUrl);
+                        // Це англійське або російське лого — потрібен переклад
+                        var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.path.replace('.svg', '.png'));
                         
-                        // ✨ Додаємо флаг перекладу у результат
-                        done({
-                            url: imgUrl,
-                            needsTranslation: true,
-                            sourceLanguage: path.sourceLanguage,
-                            movieData: path.movieData
+                        console.log('[NFX] Logo needs translation:', path.sourceLanguage);
+                        
+                        // ✨ Завантажуємо логотип та перекладаємо його
+                        LogoTranslator.processLogoForTranslation(imgUrl, function(translatedLogoUrl) {
+                            if (translatedLogoUrl) {
+                                self._setCached(cacheKey, translatedLogoUrl);
+                                done(translatedLogoUrl);
+                            } else {
+                                // Fallback на оригіналу якщо переклад не вдався
+                                self._setCached(cacheKey, imgUrl);
+                                done(imgUrl);
+                            }
                         });
                     } else {
-                        // Це просто URL - звичайне логотип
+                        // Це просто строка — звичайне логотип (українське)
                         var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
                         self._setCached(cacheKey, imgUrl);
                         done(imgUrl);
@@ -197,121 +343,6 @@
         }
     };
 
-
-    // ─────────────────────────────────────────────────────────────────
-    //  SECTION 2.5 — TRANSLATION ENGINE  (MyMemory API)
-    // ─────────────────────────────────────────────────────────────────
-
-    var PremiumLogo = {
-        _cacheKey: function(text) {
-            return 'nfx_trans_' + text.toLowerCase().replace(/\s+/g, '_');
-        },
-        
-        _getTranslation: function(text, callback) {
-            var self = this;
-            
-            if (!text || text.length === 0) {
-                callback(text);
-                return;
-            }
-            
-            var cacheKey = this._cacheKey(text);
-            
-            // Перевіряємо кеш
-            try {
-                var cached = sessionStorage.getItem(cacheKey);
-                if (cached) {
-                    callback(cached);
-                    return;
-                }
-                cached = Lampa.Storage.get(cacheKey, null);
-                if (cached) {
-                    callback(cached);
-                    return;
-                }
-            } catch (e) {}
-            
-            // Перекладаємо через MyMemory API
-            this._translateViaMyMemory(text, cacheKey, callback);
-        },
-        
-        _translateViaMyMemory: function(text, cacheKey, callback) {
-            try {
-                var encodedText = encodeURIComponent(text);
-                var url = 'https://api.mymemory.translated.net/get?q=' + encodedText + '&langpair=en|uk';
-                
-                if (typeof $ !== 'undefined' && $.get) {
-                    $.get(url, function(response) {
-                        if (response && response.responseData && response.responseData.translatedText) {
-                            var translated = response.responseData.translatedText;
-                            try {
-                                sessionStorage.setItem(cacheKey, translated);
-                                Lampa.Storage.set(cacheKey, translated);
-                            } catch (e) {}
-                            callback(translated);
-                        } else {
-                            callback(text);
-                        }
-                    }).fail(function() {
-                        callback(text);
-                    });
-                } else {
-                    fetch(url)
-                        .then(function(response) { return response.json(); })
-                        .then(function(data) {
-                            if (data && data.responseData && data.responseData.translatedText) {
-                                var translated = data.responseData.translatedText;
-                                try {
-                                    sessionStorage.setItem(cacheKey, translated);
-                                    Lampa.Storage.set(cacheKey, translated);
-                                } catch (e) {}
-                                callback(translated);
-                            } else {
-                                callback(text);
-                            }
-                        })
-                        .catch(function() {
-                            callback(text);
-                        });
-                }
-            } catch (e) {
-                callback(text);
-            }
-        },
-
-        // Додає переклад до існуючого title елементу
-        addTranslation: function(data, titleElem) {
-            if (!titleElem || !titleElem.length) return;
-            
-            var ukTitle = data.title || data.name || '';
-            var original = data.original_title || data.original_name || '';
-            var self = this;
-
-            // Якщо є український переклад - нічого не робимо
-            if (ukTitle && ukTitle !== original) {
-                return;
-            }
-
-            // Якщо немає оригіналу - виходимо
-            if (!original) return;
-
-            // Перекладаємо англійське ім'я
-            self._getTranslation(original, function(translated) {
-                // Замінюємо текст у існуючому title елементі
-                titleElem.each(function() {
-                    var $el = $(this);
-                    
-                    // Якщо вже є картинка (логотип) - не змінюємо
-                    if ($el.find('img').length > 0) {
-                        return;
-                    }
-                    
-                    // Якщо це текстовий елемент - замінюємо текст
-                    $el.text(translated);
-                });
-            });
-        }
-    };
 
     // ─────────────────────────────────────────────────────────────────
     //  SECTION 3 — HERO PROCESSOR  (logo animation on full card page)
@@ -469,20 +500,7 @@
             if (cached === 'none') return;
 
             LogoEngine.resolve(movie, function (logoUrl) {
-                // ✨ НОВЕ: Перевіряємо чи потрібен переклад
-                if (logoUrl && typeof logoUrl === 'object' && logoUrl.needsTranslation) {
-                    // Це російське або англійське лого - додаємо переклад назви фільму
-                    startLogoAnimation(logoUrl.url, titleElem, domTitle);
-                    
-                    // ✨ Додаємо переклад на екран
-                    PremiumLogo.addTranslation(movie, titleElem);
-                } else if (logoUrl) {
-                    // Звичайне логотип - просто показуємо
-                    startLogoAnimation(logoUrl, titleElem, domTitle);
-                } else {
-                    // Немає логотипу - додаємо переклад
-                    PremiumLogo.addTranslation(movie, titleElem);
-                }
+                if (logoUrl) startLogoAnimation(logoUrl, titleElem, domTitle);
             });
         });
     }
