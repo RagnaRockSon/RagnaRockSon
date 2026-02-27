@@ -88,14 +88,34 @@
          * SVGs converted to PNG via extension swap.
          */
         _pickBest: function (logos, targetLang) {
-            if (!logos || !logos.length) return null;
+    if (!logos || !logos.length) return null;
 
-            var sorted = logos.slice().sort(function (a, b) {
-                var aS = (a.file_path || '').toLowerCase().endsWith('.svg');
-                var bS = (b.file_path || '').toLowerCase().endsWith('.svg');
-                return aS === bS ? 0 : (aS ? 1 : -1);
-            });
+    var sorted = logos.slice().sort(function (a, b) {
+        var aS = (a.file_path || '').toLowerCase().endsWith('.svg');
+        var bS = (b.file_path || '').toLowerCase().endsWith('.svg');
+        return aS === bS ? 0 : (aS ? 1 : -1);
+    });
 
+    var ukLogo = null;
+    var enLogo = null;
+
+    for (var i = 0; i < sorted.length; i++) {
+        if (!sorted[i].file_path) continue;
+
+        if (sorted[i].iso_639_1 === 'uk')
+            ukLogo = sorted[i].file_path;
+
+        if (sorted[i].iso_639_1 === 'en')
+            enLogo = sorted[i].file_path;
+    }
+
+    if (ukLogo) return ukLogo;
+
+    // якщо немає uk, але є en — повертаємо спеціальний маркер
+    if (enLogo) return { en: enLogo };
+
+    return null;
+}
             // 1. Direct match
             for (var i = 0; i < sorted.length; i++) {
                 if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) return sorted[i].file_path;
