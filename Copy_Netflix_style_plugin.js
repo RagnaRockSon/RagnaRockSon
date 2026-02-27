@@ -119,27 +119,7 @@
 
     // інші методи LogoEngine тут…
 };
-            // 1. Direct match
-            for (var i = 0; i < sorted.length; i++) {
-                if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) return sorted[i].file_path;
-            }
-
-            // 2. Ukrainian Fallback -> Russian
-            if (targetLang === 'uk' || targetLang === 'ua') {
-                for (var r = 0; r < sorted.length; r++) {
-                    if (sorted[r].iso_639_1 === 'ru' && sorted[r].file_path) return sorted[r].file_path;
-                }
-            }
-
-            // 3. Fallback -> English
-            for (var j = 0; j < sorted.length; j++) {
-                if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) return sorted[j].file_path;
-            }
-
-            // 4. Any
-            return sorted[0] && sorted[0].file_path ? sorted[0].file_path : null;
-        },
-
+            
         _getLang: function () {
             var manual = Lampa.Storage.get('nfx_logo_lang', 'auto');
             if (manual && manual !== 'auto') return manual;
