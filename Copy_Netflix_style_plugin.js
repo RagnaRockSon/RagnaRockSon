@@ -165,6 +165,37 @@
         }
     };
 
+var PremiumLogo = {
+
+    renderTextFallback: function(data) {
+
+        var hero = document.querySelector('.full-start-new__body');
+        if (!hero) return;
+
+        // прибираємо старе текстове лого якщо є
+        var old = hero.querySelector('.premium-ua-logo');
+        if (old) old.remove();
+
+        var ukTitle = data.title || data.name || '';
+        var original = data.original_title || data.original_name || '';
+
+        // якщо переклад відсутній або співпадає з оригіналом — показуємо англійський img
+        if (!ukTitle || ukTitle === original) {
+            return;
+        }
+
+        var el = document.createElement('div');
+        el.className = 'premium-ua-logo';
+        el.textContent = ukTitle;
+
+        hero.prepend(el);
+
+        // анімація
+        requestAnimationFrame(function(){
+            el.classList.add('show');
+        });
+    }
+};
 
     // ─────────────────────────────────────────────────────────────────
     //  SECTION 3 — HERO PROCESSOR  (logo animation on full card page)
