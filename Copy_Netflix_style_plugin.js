@@ -102,7 +102,7 @@
         }
 
         if (ukLogo) return ukLogo;
-        if (enLogo) return { en: enLogo };
+        if (enLogo) return enLogo;
         return null;
     },
 
@@ -162,14 +162,21 @@ var PremiumLogo = {
         var ukTitle = data.title || data.name || '';
         var original = data.original_title || data.original_name || '';
 
-        // якщо переклад відсутній або співпадає з оригіналом — показуємо англійський img
+        // якщо переклад відсутній або співпадає з оригіналом — показуємо англійський текст з українським стилем
         if (!ukTitle || ukTitle === original) {
-            return;
+            ukTitle = original; // використовуємо англійське назву з українським оформленням
         }
+
+        if (!ukTitle) return;
 
         var el = document.createElement('div');
         el.className = 'premium-ua-logo';
         el.textContent = ukTitle;
+
+        // додаємо клас для розрізнення англійського та українського лого
+        if (!data.title && !data.name) {
+            el.classList.add('premium-logo-en');
+        }
 
         hero.prepend(el);
 
@@ -203,12 +210,6 @@ var PremiumLogo = {
      *  1. Fade out text  2. Replace with <img>  3. Morph height  4. Fade in logo
      */
     function startLogoAnimation(imgUrl, titleElem, domTitle) {
-// ✅ Перевірка Premium fallback
-    if (typeof imgUrl === 'object' && imgUrl.en) {
-        PremiumLogo.renderTextFallback(cardData); // cardData має бути доступний тут
-        return; // не вставляємо <img>
-    }
-
         var img = new Image();
         img.src = imgUrl;
 
@@ -585,6 +586,21 @@ body {
 .premium-ua-logo.show {
     opacity: 1;
     transform: translateY(0) scale(1);
+}
+
+/* Адаптація англійського лого під український стиль */
+.premium-ua-logo.premium-logo-en {
+    font-size: 48px;
+    letter-spacing: 0.5px;
+    font-weight: 800;
+    font-style: italic;
+    /* додаємо легкий акцент кольору для англійського тексту */
+    background: linear-gradient(135deg, #fff 0%, rgba(255,255,255,0.95) 100%);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+    text-shadow: none;
+    filter: drop-shadow(0 4px 16px rgba(0,0,0,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.5));
 }
 
 /* ================================================================
