@@ -189,6 +189,12 @@
      *  1. Fade out text  2. Replace with <img>  3. Morph height  4. Fade in logo
      */
     function startLogoAnimation(imgUrl, titleElem, domTitle) {
+// ✅ Перевірка Premium fallback
+    if (typeof imgUrl === 'object' && imgUrl.en) {
+        PremiumLogo.renderTextFallback(cardData); // cardData має бути доступний тут
+        return; // не вставляємо <img>
+    }
+
         var img = new Image();
         img.src = imgUrl;
 
