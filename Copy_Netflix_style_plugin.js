@@ -86,8 +86,9 @@
         /**
          * Pick best logo: target_lang PNG → en PNG → any first.
          * SVGs converted to PNG via extension swap.
+         * ✨ NEW: Якщо немає UK логотипу, намагаємось перекласти назву на українську
          */
-        _pickBest: function (logos, targetLang) {
+        _pickBest: function (logos, targetLang, movieData) {
             if (!logos || !logos.length) return null;
 
             var sorted = logos.slice().sort(function (a, b) {
@@ -96,21 +97,37 @@
                 return aS === bS ? 0 : (aS ? 1 : -1);
             });
 
-            // 1. Direct match
+            // 1. Direct match (шукаємо потрібну мову)
             for (var i = 0; i < sorted.length; i++) {
                 if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) return sorted[i].file_path;
             }
 
-            // 2. Ukrainian Fallback -> Russian
+            // 2. Ukrainian Fallback -> Russian (якщо шукаємо українське, пробуємо російське)
             if (targetLang === 'uk' || targetLang === 'ua') {
                 for (var r = 0; r < sorted.length; r++) {
-                    if (sorted[r].iso_639_1 === 'ru' && sorted[r].file_path) return sorted[r].file_path;
+                    if (sorted[r].iso_639_1 === 'ru' && sorted[r].file_path) {
+                        // ✨ НОВЕ: Повертаємо російське лого з флагом що потрібен переклад
+                        return {
+                            url: sorted[r].file_path,
+                            needsTranslation: true,
+                            sourceLanguage: 'ru',
+                            movieData: movieData
+                        };
+                    }
                 }
             }
 
-            // 3. Fallback -> English
+            // 3. Fallback -> English (якщо нічого не знайшли, пробуємо англійське)
             for (var j = 0; j < sorted.length; j++) {
-                if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) return sorted[j].file_path;
+                if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) {
+                    // ✨ НОВЕ: Повертаємо англійське лого з флагом що потрібен переклад
+                    return {
+                        url: sorted[j].file_path,
+                        needsTranslation: true,
+                        sourceLanguage: 'en',
+                        movieData: movieData
+                    };
+                }
             }
 
             // 4. Any
@@ -147,11 +164,29 @@
             var size = Lampa.Storage.get('logo_size', 'original') || 'original';
 
             $.get(url, function (data_api) {
-                var path = self._pickBest(data_api.logos, lang);
+                // ✨ НОВЕ: Передаємо movie у _pickBest
+                var path = self._pickBest(data_api.logos, lang, movie);
+                
                 if (path) {
-                    var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
-                    self._setCached(cacheKey, imgUrl);
-                    done(imgUrl);
+                    // ✨ НОВЕ: Перевіряємо чи це об'єкт з флагом needsTranslation
+                    if (typeof path === 'object' && path.needsTranslation) {
+                        // Це російське або англійське лого - потрібен переклад назви
+                        var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.url.replace('.svg', '.png'));
+                        self._setCached(cacheKey, imgUrl);
+                        
+                        // ✨ Додаємо флаг перекладу у результат
+                        done({
+                            url: imgUrl,
+                            needsTranslation: true,
+                            sourceLanguage: path.sourceLanguage,
+                            movieData: path.movieData
+                        });
+                    } else {
+                        // Це просто URL - звичайне логотип
+                        var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
+                        self._setCached(cacheKey, imgUrl);
+                        done(imgUrl);
+                    }
                 } else {
                     self._setCached(cacheKey, 'none');
                     done(null);
@@ -434,10 +469,18 @@
             if (cached === 'none') return;
 
             LogoEngine.resolve(movie, function (logoUrl) {
-                if (logoUrl) {
+                // ✨ НОВЕ: Перевіряємо чи потрібен переклад
+                if (logoUrl && typeof logoUrl === 'object' && logoUrl.needsTranslation) {
+                    // Це російське або англійське лого - додаємо переклад назви фільму
+                    startLogoAnimation(logoUrl.url, titleElem, domTitle);
+                    
+                    // ✨ Додаємо переклад на екран
+                    PremiumLogo.addTranslation(movie, titleElem);
+                } else if (logoUrl) {
+                    // Звичайне логотип - просто показуємо
                     startLogoAnimation(logoUrl, titleElem, domTitle);
                 } else {
-                    // Якщо немає логотипу, намагаємось додати переклад англійської назви
+                    // Немає логотипу - додаємо переклад
                     PremiumLogo.addTranslation(movie, titleElem);
                 }
             });
