@@ -115,7 +115,10 @@
     if (enLogo) return { en: enLogo };
 
     return null;
-}
+ },
+
+    // інші методи LogoEngine тут…
+};
             // 1. Direct match
             for (var i = 0; i < sorted.length; i++) {
                 if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) return sorted[i].file_path;
