@@ -150,6 +150,91 @@
 
 var PremiumLogo = {
 
+    _translationCache: {},
+    
+    _cacheKey: function(text) {
+        return 'nfx_trans_' + text.toLowerCase().replace(/\s+/g, '_');
+    },
+    
+    _getTranslation: function(text, callback) {
+        var self = this;
+        
+        if (!text) {
+            callback(text);
+            return;
+        }
+        
+        var cacheKey = this._cacheKey(text);
+        
+        // 1. Перевіряємо локальний кеш (sessionStorage + Lampa)
+        try {
+            var cached = sessionStorage.getItem(cacheKey);
+            if (cached) {
+                callback(cached);
+                return;
+            }
+            cached = Lampa.Storage.get(cacheKey, null);
+            if (cached) {
+                callback(cached);
+                return;
+            }
+        } catch (e) {}
+        
+        // 2. Перекладаємо через MyMemory API
+        this._translateViaMyMemory(text, cacheKey, callback);
+    },
+    
+    _translateViaMyMemory: function(text, cacheKey, callback) {
+        var self = this;
+        
+        try {
+            // MyMemory API - безплатна, швидка, надійна
+            var encodedText = encodeURIComponent(text);
+            var url = 'https://api.mymemory.translated.net/get?q=' + encodedText + '&langpair=en|uk';
+            
+            // Використовуємо $.get якщо jQuery доступний, інакше fetch
+            if (typeof $ !== 'undefined' && $.get) {
+                $.get(url, function(response) {
+                    if (response && response.responseData && response.responseData.translatedText) {
+                        var translated = response.responseData.translatedText;
+                        // Записуємо у кеш
+                        try {
+                            sessionStorage.setItem(cacheKey, translated);
+                            Lampa.Storage.set(cacheKey, translated);
+                        } catch (e) {}
+                        callback(translated);
+                    } else {
+                        callback(text);
+                    }
+                }).fail(function() {
+                    callback(text);
+                });
+            } else {
+                // Fallback на fetch для старих платформ
+                fetch(url)
+                    .then(function(response) { return response.json(); })
+                    .then(function(data) {
+                        if (data && data.responseData && data.responseData.translatedText) {
+                            var translated = data.responseData.translatedText;
+                            try {
+                                sessionStorage.setItem(cacheKey, translated);
+                                Lampa.Storage.set(cacheKey, translated);
+                            } catch (e) {}
+                            callback(translated);
+                        } else {
+                            callback(text);
+                        }
+                    })
+                    .catch(function() {
+                        callback(text);
+                    });
+            }
+        } catch (e) {
+            console.log('[NFX] Translation error:', e);
+            callback(text);
+        }
+    },
+
     renderTextFallback: function(data) {
 
         var hero = document.querySelector('.full-start-new__body');
@@ -161,21 +246,33 @@ var PremiumLogo = {
 
         var ukTitle = data.title || data.name || '';
         var original = data.original_title || data.original_name || '';
+        var self = this;
 
-        // якщо переклад відсутній або співпадає з оригіналом — показуємо англійський текст з українським стилем
+        // якщо переклад відсутній або співпадає з оригіналом — намагаємося перекласти англійське
         if (!ukTitle || ukTitle === original) {
-            ukTitle = original; // використовуємо англійське назву з українським оформленням
+            if (original) {
+                // Намагаємося перекласти англійське ім'я через API
+                self._getTranslation(original, function(translated) {
+                    self._renderLogo(hero, translated, true);
+                });
+            }
+            return;
         }
 
-        if (!ukTitle) return;
+        // Якщо є український переклад у TMDB (оригіналу з локалізацією, не машинний переклад)
+        self._renderLogo(hero, ukTitle, false);
+    },
+    
+    _renderLogo: function(hero, text, isTranslated) {
+        if (!text) return;
 
         var el = document.createElement('div');
         el.className = 'premium-ua-logo';
-        el.textContent = ukTitle;
+        el.textContent = text;
 
-        // додаємо клас для розрізнення англійського та українського лого
-        if (!data.title && !data.name) {
-            el.classList.add('premium-logo-en');
+        // додаємо клас якщо це переведений текст
+        if (isTranslated) {
+            el.classList.add('premium-logo-translated');
         }
 
         hero.prepend(el);
@@ -601,6 +698,20 @@ body {
     background-clip: text;
     text-shadow: none;
     filter: drop-shadow(0 4px 16px rgba(0,0,0,0.7)) drop-shadow(0 2px 4px rgba(0,0,0,0.5));
+}
+
+/* Стиль для автоматично перекладеного тексту */
+.premium-ua-logo.premium-logo-translated {
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow:
+        0 6px 24px rgba(0,0,0,.85),
+        0 2px 6px rgba(0,0,0,.6);
+    /* Додаємо бірку що це переклад (легкий акцент з боку) */
+    border-left: 3px solid rgba(229, 9, 20, 0.6);
+    padding-left: 12px;
 }
 
 /* ================================================================
