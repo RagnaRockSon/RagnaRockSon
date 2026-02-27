@@ -97,12 +97,8 @@
 
         for (var i = 0; i < sorted.length; i++) {
             if (!sorted[i].file_path) continue;
-
-            if (sorted[i].iso_639_1 === 'uk')
-                ukLogo = sorted[i].file_path;
-
-            if (sorted[i].iso_639_1 === 'en')
-                enLogo = sorted[i].file_path;
+            if (sorted[i].iso_639_1 === 'uk') ukLogo = sorted[i].file_path;
+            if (sorted[i].iso_639_1 === 'en') enLogo = sorted[i].file_path;
         }
 
         if (ukLogo) return ukLogo;
