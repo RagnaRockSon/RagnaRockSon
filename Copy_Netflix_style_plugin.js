@@ -1,13 +1,205 @@
 (function () {
     'use strict';
 
-    // ✨ Завантажуємо Tesseract.js для OCR
+    var isExoticOS = /Vidaa|Web0S|Tizen|SmartTV|Metrological|NetCast/i.test(navigator.userAgent);
+
+    // ✨ ЗАВАНТАЖУЄМО TESSERACT ОДИН РАЗ НА ПОЧАТКУ
+    var TesseractReady = false;
+    var TesseractQueue = [];
+    
+    // Завантажуємо Tesseract.js з CDN
     var script = document.createElement('script');
-    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@5/dist/tesseract.min.js';
-    script.async = true;
+    script.src = 'https://cdn.jsdelivr.net/npm/tesseract.js@4/dist/tesseract.min.js';
+    script.onload = function() {
+        console.log('[NFX] Tesseract.js завантажено');
+        TesseractReady = true;
+        
+        // Обробляємо чергу очікуючих завдань
+        TesseractQueue.forEach(function(fn) {
+            fn();
+        });
+        TesseractQueue = [];
+    };
+    script.onerror = function() {
+        console.log('[NFX] Помилка завантаження Tesseract.js');
+        TesseractReady = false;
+    };
     document.head.appendChild(script);
 
-    var isExoticOS = /Vidaa|Web0S|Tizen|SmartTV|Metrological|NetCast/i.test(navigator.userAgent);
+    // ─────────────────────────────────────────────────────────────────
+    //  LOGO OCR TRANSLATOR
+    // ─────────────────────────────────────────────────────────────────
+    
+    var LogoOCR = {
+        _cache: {},
+        
+        // Головна функція - обробляє логотип
+        processLogo: function(logoUrl, sourceLanguage, callback) {
+            console.log('[NFX OCR] Processing logo:', logoUrl);
+            
+            if (!logoUrl) {
+                callback(null);
+                return;
+            }
+            
+            // Завантажуємо картинку
+            var img = new Image();
+            img.crossOrigin = 'anonymous';
+            
+            img.onload = function() {
+                console.log('[NFX OCR] Image loaded, size:', img.width, 'x', img.height);
+                
+                // Якщо Tesseract ще не готовий - додаємо у чергу
+                if (!TesseractReady) {
+                    console.log('[NFX OCR] Tesseract not ready, queuing...');
+                    TesseractQueue.push(function() {
+                        LogoOCR._recognizeAndTranslate(img, sourceLanguage, callback);
+                    });
+                } else {
+                    LogoOCR._recognizeAndTranslate(img, sourceLanguage, callback);
+                }
+            };
+            
+            img.onerror = function() {
+                console.log('[NFX OCR] Failed to load image');
+                callback(null);
+            };
+            
+            img.src = logoUrl;
+        },
+        
+        // Розпізнаємо текст та перекладаємо
+        _recognizeAndTranslate: function(img, sourceLanguage, callback) {
+            console.log('[NFX OCR] Starting recognition...');
+            
+            // Визначаємо мови для Tesseract
+            var languages = 'eng';  // Англійська за замовчуванням
+            if (sourceLanguage === 'ru') {
+                languages = 'rus+eng';  // Російська + англійська
+            }
+            
+            // Запускаємо OCR
+            Tesseract.recognize(img, languages, {
+                logger: function(m) {
+                    if (m.status === 'recognizing text') {
+                        console.log('[NFX OCR] Progress:', Math.round(m.progress * 100) + '%');
+                    }
+                }
+            }).then(function(result) {
+                var text = result.data.text.trim();
+                console.log('[NFX OCR] Recognized text:', text);
+                
+                if (!text || text.length < 2) {
+                    console.log('[NFX OCR] No text found, returning original');
+                    callback(null);
+                    return;
+                }
+                
+                // Перекладаємо
+                LogoOCR._translateAndDraw(img, text, callback);
+            }).catch(function(err) {
+                console.log('[NFX OCR] Recognition error:', err);
+                callback(null);
+            });
+        },
+        
+        // Перекладаємо та замінюємо текст у картинці
+        _translateAndDraw: function(img, recognizedText, callback) {
+            // Перекладаємо текст
+            LogoOCR._translate(recognizedText, function(translatedText) {
+                console.log('[NFX OCR] Translation:', recognizedText, '→', translatedText);
+                
+                // Малюємо на Canvas
+                var newImageUrl = LogoOCR._drawTranslatedLogo(img, recognizedText, translatedText);
+                
+                if (newImageUrl) {
+                    console.log('[NFX OCR] Canvas drawing successful');
+                    callback(newImageUrl);
+                } else {
+                    console.log('[NFX OCR] Canvas drawing failed');
+                    callback(null);
+                }
+            });
+        },
+        
+        // Перекладаємо через API
+        _translate: function(text, callback) {
+            // Перевіряємо кеш
+            if (this._cache[text]) {
+                callback(this._cache[text]);
+                return;
+            }
+            
+            var url = 'https://api.mymemory.translated.net/get?q=' + 
+                      encodeURIComponent(text) + '&langpair=en|uk';
+            
+            var self = this;
+            
+            if (typeof $ !== 'undefined' && $.get) {
+                $.get(url, function(resp) {
+                    if (resp && resp.responseData && resp.responseData.translatedText) {
+                        var trans = resp.responseData.translatedText;
+                        self._cache[text] = trans;
+                        callback(trans);
+                    } else {
+                        callback(text);
+                    }
+                }).fail(function() {
+                    callback(text);
+                });
+            } else {
+                fetch(url)
+                    .then(r => r.json())
+                    .then(d => {
+                        var trans = d.responseData.translatedText || text;
+                        self._cache[text] = trans;
+                        callback(trans);
+                    })
+                    .catch(() => callback(text));
+            }
+        },
+        
+        // Малюємо переклад на Canvas
+        _drawTranslatedLogo: function(img, oldText, newText) {
+            try {
+                var canvas = document.createElement('canvas');
+                canvas.width = img.width;
+                canvas.height = img.height;
+                
+                var ctx = canvas.getContext('2d');
+                
+                // Малюємо оригіналу картинку
+                ctx.drawImage(img, 0, 0);
+                
+                // Замінюємо текст
+                // Шукаємо куди писати на логотипі
+                var fontSize = Math.max(img.width / 10, 20);  // Розмір шрифту
+                
+                ctx.font = 'bold ' + fontSize + 'px Arial, sans-serif';
+                ctx.fillStyle = '#ffffff';  // Білий текст
+                ctx.strokeStyle = '#000000';  // Чорна обводка для видимості
+                ctx.lineWidth = 2;
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                
+                // Малюємо у центр логотипу
+                var x = canvas.width / 2;
+                var y = canvas.height / 2;
+                
+                ctx.strokeText(newText, x, y);
+                ctx.fillText(newText, x, y);
+                
+                // Повертаємо як Data URL
+                var dataUrl = canvas.toDataURL('image/png');
+                console.log('[NFX OCR] Canvas size:', canvas.width, 'x', canvas.height);
+                
+                return dataUrl;
+            } catch (e) {
+                console.log('[NFX OCR] Canvas error:', e);
+                return null;
+            }
+        }
+    };
 
     /* ================================================================
      *  Netflix Premium Style v8.0  —  Multi-screen, Custom UI
@@ -65,144 +257,6 @@
 
 
     // ─────────────────────────────────────────────────────────────────
-    //  SECTION 2.5 — LOGO TRANSLATOR  (OCR + Canvas)
-    // ─────────────────────────────────────────────────────────────────
-
-    var LogoTranslator = {
-        _translationCache: {},
-        
-        _cacheKey: function(text) {
-            return 'nfx_logo_trans_' + text.toLowerCase().replace(/\s+/g, '_');
-        },
-        
-        // Переклад текстуliterally (MyMemory API)
-        _translateText: function(text, callback) {
-            var cacheKey = this._cacheKey(text);
-            
-            try {
-                var cached = sessionStorage.getItem(cacheKey);
-                if (cached) {
-                    callback(cached);
-                    return;
-                }
-            } catch (e) {}
-            
-            var encodedText = encodeURIComponent(text);
-            var url = 'https://api.mymemory.translated.net/get?q=' + encodedText + '&langpair=en|uk';
-            
-            if (typeof $ !== 'undefined' && $.get) {
-                $.get(url, function(response) {
-                    if (response && response.responseData && response.responseData.translatedText) {
-                        var translated = response.responseData.translatedText;
-                        try {
-                            sessionStorage.setItem(cacheKey, translated);
-                        } catch (e) {}
-                        callback(translated);
-                    } else {
-                        callback(text);
-                    }
-                }).fail(function() {
-                    callback(text);
-                });
-            } else {
-                fetch(url)
-                    .then(function(r) { return r.json(); })
-                    .then(function(data) {
-                        var trans = data.responseData.translatedText || text;
-                        try {
-                            sessionStorage.setItem(cacheKey, trans);
-                        } catch (e) {}
-                        callback(trans);
-                    })
-                    .catch(function() { callback(text); });
-            }
-        },
-        
-        // Завантажити логотип та перекласти його
-        processLogoForTranslation: function(logoUrl, callback) {
-            // ✨ Завантажуємо картинку
-            var img = new Image();
-            img.crossOrigin = 'anonymous';
-            img.onload = function() {
-                // ✨ Завантажуємо Tesseract для розпізнавання тексту
-                if (typeof Tesseract === 'undefined') {
-                    // Якщо Tesseract не завантажено — просто показуємо оригіналу логотип
-                    console.log('[NFX] Tesseract not available, using original logo');
-                    callback(logoUrl);
-                    return;
-                }
-                
-                // ✨ Розпізнаємо текст у логотипі (OCR)
-                Tesseract.recognize(img, 'rus+eng').then(function(result) {
-                    var extractedText = result.data.text.trim();
-                    
-                    if (!extractedText || extractedText.length < 2) {
-                        // Якщо не вдалось розпізнати текст — показуємо оригіналу
-                        console.log('[NFX] No text detected in logo');
-                        callback(logoUrl);
-                        return;
-                    }
-                    
-                    console.log('[NFX] Extracted text:', extractedText);
-                    
-                    // ✨ Перекладаємо витягнений текст
-                    LogoTranslator._translateText(extractedText, function(translatedText) {
-                        console.log('[NFX] Translated text:', translatedText);
-                        
-                        // ✨ Замінюємо текст у логотипі за допомогою Canvas
-                        var newLogoUrl = LogoTranslator._replaceTextInLogo(img, extractedText, translatedText);
-                        callback(newLogoUrl);
-                    });
-                }).catch(function(err) {
-                    console.log('[NFX] OCR error:', err);
-                    callback(logoUrl);  // Fallback на оригіналу
-                });
-            };
-            img.onerror = function() {
-                console.log('[NFX] Failed to load logo image');
-                callback(logoUrl);  // Fallback на оригіналу
-            };
-            img.src = logoUrl;
-        },
-        
-        // Замінити текст у логотипі за допомогою Canvas
-        _replaceTextInLogo: function(img, oldText, newText) {
-            try {
-                // ✨ Створюємо Canvas з розмірами логотипу
-                var canvas = document.createElement('canvas');
-                canvas.width = img.width;
-                canvas.height = img.height;
-                
-                var ctx = canvas.getContext('2d');
-                
-                // ✨ Малюємо оригіналу картинку
-                ctx.drawImage(img, 0, 0);
-                
-                // ✨ Замінюємо текст
-                // Це складна операція — потрібно:
-                // 1. Знайти позицію тексту
-                // 2. Стерти старий текст
-                // 3. Написати новий текст
-                
-                // Спрощений варіант — просто додаємо український текст
-                ctx.font = '48px Arial, sans-serif';
-                ctx.fillStyle = '#ffffff';
-                ctx.textAlign = 'center';
-                ctx.textBaseline = 'middle';
-                
-                // Малюємо переклад у центр
-                ctx.fillText(newText, canvas.width / 2, canvas.height / 2);
-                
-                // ✨ Повертаємо нову картинку як Data URL
-                return canvas.toDataURL('image/png');
-            } catch (e) {
-                console.log('[NFX] Canvas error:', e);
-                return null;  // Не вдалось обробити
-            }
-        }
-    };
-
-    // ─────────────────────────────────────────────────────────────────
     //  SECTION 2 — LOGO ENGINE  (NO hardcoded API keys)
     // ─────────────────────────────────────────────────────────────────
 
@@ -228,8 +282,8 @@
         },
 
         /**
-         * Pick best logo: UK → EN → RU (but EN/RU need translation)
-         * SVGs converted to PNG via extension swap.
+         * Pick best logo: target_lang PNG → en PNG → ru PNG → any first.
+         * ✨ Returns: { path, language } for EN/RU that need translation
          */
         _pickBest: function (logos, targetLang) {
             if (!logos || !logos.length) return null;
@@ -240,40 +294,40 @@
                 return aS === bS ? 0 : (aS ? 1 : -1);
             });
 
-            // 1. Шукаємо українське (uk)
+            // 1. Direct match (українське)
             for (var i = 0; i < sorted.length; i++) {
                 if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) {
-                    return sorted[i].file_path;  // Повертаємо як строка (немає перекладу потрібен)
+                    return sorted[i].file_path;  // Просто строка, без перекладу
                 }
             }
 
-            // 2. Якщо шукаємо українське, але немає — шукаємо англійське
+            // 2. Fallback -> English (з перекладом)
             if (targetLang === 'uk' || targetLang === 'ua') {
                 for (var j = 0; j < sorted.length; j++) {
                     if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) {
-                        // ✨ Повертаємо ОБЪЕКТ з флагом перекладу (англійське)
+                        // ✨ Повертаємо об'єкт з флагом що потрібен переклад
                         return {
                             path: sorted[j].file_path,
-                            needsTranslation: true,
-                            sourceLanguage: 'en'
+                            language: 'en',
+                            needsOCR: true
                         };
                     }
                 }
                 
-                // 3. Тільки якщо немає англійського — використовуємо російське для перекладу
+                // 3. Ukrainian Fallback -> Russian (з перекладом)
                 for (var r = 0; r < sorted.length; r++) {
                     if (sorted[r].iso_639_1 === 'ru' && sorted[r].file_path) {
-                        // ✨ Повертаємо ОБЪЕКТ з флагом перекладу (російське)
+                        // ✨ Повертаємо об'єкт з флагом що потрібен переклад
                         return {
                             path: sorted[r].file_path,
-                            needsTranslation: true,
-                            sourceLanguage: 'ru'
+                            language: 'ru',
+                            needsOCR: true
                         };
                     }
                 }
             }
 
-            // 4. Будь-яке інше (без перекладу)
+            // 4. Any
             return sorted[0] && sorted[0].file_path ? sorted[0].file_path : null;
         },
 
@@ -286,6 +340,7 @@
 
         /**
          * Resolve logo — uses Lampa.TMDB.api() + Lampa.TMDB.key()
+         * ✨ NEW: Processes EN/RU logos with OCR translation
          */
         resolve: function (movie, done) {
             if (!movie || !movie.id) { done(null); return; }
@@ -307,29 +362,32 @@
             var size = Lampa.Storage.get('logo_size', 'original') || 'original';
 
             $.get(url, function (data_api) {
-                var path = self._pickBest(data_api.logos, lang);
-                if (path) {
-                    // ✨ НОВЕ: Перевіряємо чи це об'єкт з флагом needsTranslation
-                    if (typeof path === 'object' && path.needsTranslation) {
-                        // Це англійське або російське лого — потрібен переклад
-                        var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.path.replace('.svg', '.png'));
+                var result = self._pickBest(data_api.logos, lang);
+                
+                if (result) {
+                    var imgUrl;
+                    
+                    // ✨ НОВЕ: Перевіряємо чи потрібен OCR переклад
+                    if (typeof result === 'object' && result.needsOCR) {
+                        imgUrl = Lampa.TMDB.image('/t/p/' + size + result.path.replace('.svg', '.png'));
                         
-                        console.log('[NFX] Logo needs translation:', path.sourceLanguage);
+                        console.log('[NFX] Logo needs OCR translation:', result.language);
                         
-                        // ✨ Завантажуємо логотип та перекладаємо його
-                        LogoTranslator.processLogoForTranslation(imgUrl, function(translatedLogoUrl) {
+                        // Обробляємо логотип через OCR
+                        LogoOCR.processLogo(imgUrl, result.language, function(translatedLogoUrl) {
                             if (translatedLogoUrl) {
+                                console.log('[NFX] OCR translation successful');
                                 self._setCached(cacheKey, translatedLogoUrl);
                                 done(translatedLogoUrl);
                             } else {
-                                // Fallback на оригіналу якщо переклад не вдався
+                                console.log('[NFX] OCR translation failed, using original');
                                 self._setCached(cacheKey, imgUrl);
                                 done(imgUrl);
                             }
                         });
                     } else {
-                        // Це просто строка — звичайне логотип (українське)
-                        var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
+                        // Звичайне логотип (українське) - без OCR
+                        imgUrl = Lampa.TMDB.image('/t/p/' + size + result.replace('.svg', '.png'));
                         self._setCached(cacheKey, imgUrl);
                         done(imgUrl);
                     }
