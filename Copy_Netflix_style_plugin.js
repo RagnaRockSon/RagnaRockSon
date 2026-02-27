@@ -293,7 +293,12 @@ var PremiumLogo = {
     },
     
     _renderLogo: function(hero, text, isTranslated) {
-        if (!text) return;
+        if (!text || text.length === 0) {
+            console.log('[NFX] _renderLogo: Empty text, skipping');
+            return;
+        }
+
+        console.log('[NFX] _renderLogo: Rendering', (isTranslated ? 'TRANSLATED' : 'NATIVE'), 'logo');
 
         var el = document.createElement('div');
         el.className = 'premium-ua-logo';
@@ -302,13 +307,21 @@ var PremiumLogo = {
         // додаємо клас якщо це переведений текст
         if (isTranslated) {
             el.classList.add('premium-logo-translated');
+            console.log('[NFX] Added class: premium-logo-translated');
+        } else {
+            el.classList.add('premium-logo-native');
+            console.log('[NFX] Added class: premium-logo-native');
         }
 
         hero.prepend(el);
+        console.log('[NFX] Element added to DOM');
 
-        // анімація
+        // анімація - з невеликою затримкою щоб CSS мав час застосуватися
         requestAnimationFrame(function(){
-            el.classList.add('show');
+            requestAnimationFrame(function(){
+                el.classList.add('show');
+                console.log('[NFX] Animation started');
+            });
         });
     }
 };
@@ -719,34 +732,37 @@ body {
 }
 
 .premium-ua-logo.show {
-    opacity: 1;
-    transform: translateY(0) scale(1);
+    opacity: 1 !important;
+    transform: translateY(0) scale(1) !important;
 }
 
-/* Адаптація англійського лого під український стиль */
-.premium-ua-logo.premium-logo-en {
-    font-size: 48px;
-    letter-spacing: 0.5px;
-    font-weight: 800;
-    font-style: italic;
-    color: #fff;
+/* Рідний український логотип від TMDB */
+.premium-ua-logo.premium-logo-native {
+    font-size: 52px !important;
+    font-weight: 900 !important;
+    letter-spacing: 1px !important;
+    color: #fff !important;
     text-shadow:
         0 6px 24px rgba(0,0,0,.85),
-        0 2px 6px rgba(0,0,0,.6);
+        0 2px 6px rgba(0,0,0,.6) !important;
+    border-left: none !important;
+    padding-left: 0 !important;
 }
 
-/* Стиль для автоматично перекладеного тексту */
+/* Стиль для автоматично перекладеного тексту через API */
 .premium-ua-logo.premium-logo-translated {
-    font-size: 52px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    color: #fff;
+    font-size: 52px !important;
+    font-weight: 900 !important;
+    letter-spacing: 1px !important;
+    color: #fff !important;
     text-shadow:
         0 6px 24px rgba(0,0,0,.85),
-        0 2px 6px rgba(0,0,0,.6);
-    /* Додаємо бірку що це переклад (легкий акцент з боку) */
-    border-left: 3px solid rgba(229, 9, 20, 0.6);
-    padding-left: 12px;
+        0 2px 6px rgba(0,0,0,.6) !important;
+    /* Червона обідка для позначення перекладу */
+    border-left: 3px solid rgba(229, 9, 20, 0.8) !important;
+    padding-left: 12px !important;
+    /* Переконуємось що обідка видна */
+    box-sizing: border-box !important;
 }
 
 /* ================================================================
