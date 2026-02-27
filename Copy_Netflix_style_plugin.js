@@ -63,268 +63,220 @@
     // ─────────────────────────────────────────────────────────────────
 
     var LogoEngine = {
-    _cachePrefix: 'nfx_logo_v7_',
+        _cachePrefix: 'nfx_logo_v7_',
 
-    _key: function (type, id, lang) {
-        return this._cachePrefix + type + '_' + id + '_' + lang;
-    },
+        _key: function (type, id, lang) {
+            return this._cachePrefix + type + '_' + id + '_' + lang;
+        },
 
-    _getCached: function (key) {
-        try {
-            var s = sessionStorage.getItem(key);
-            if (s) return s;
-        } catch (e) { /* ignore */ }
-        return Lampa.Storage.get(key, null);
-    },
+        _getCached: function (key) {
+            try {
+                var s = sessionStorage.getItem(key);
+                if (s) return s;
+            } catch (e) { /* ignore */ }
+            return Lampa.Storage.get(key, null);
+        },
 
-    _setCached: function (key, value) {
-        var v = value || 'none';
-        try { sessionStorage.setItem(key, v); } catch (e) { /* ignore */ }
-        Lampa.Storage.set(key, v);
-    },
+        _setCached: function (key, value) {
+            var v = value || 'none';
+            try { sessionStorage.setItem(key, v); } catch (e) { /* ignore */ }
+            Lampa.Storage.set(key, v);
+        },
 
-    _pickBest: function (logos, targetLang) {
-        if (!logos || !logos.length) return null;
+        /**
+         * Pick best logo: target_lang PNG → en PNG → any first.
+         * SVGs converted to PNG via extension swap.
+         */
+        _pickBest: function (logos, targetLang) {
+            if (!logos || !logos.length) return null;
 
-        var sorted = logos.slice().sort(function (a, b) {
-            var aS = (a.file_path || '').toLowerCase().endsWith('.svg');
-            var bS = (b.file_path || '').toLowerCase().endsWith('.svg');
-            return aS === bS ? 0 : (aS ? 1 : -1);
-        });
+            var sorted = logos.slice().sort(function (a, b) {
+                var aS = (a.file_path || '').toLowerCase().endsWith('.svg');
+                var bS = (b.file_path || '').toLowerCase().endsWith('.svg');
+                return aS === bS ? 0 : (aS ? 1 : -1);
+            });
 
-        var ukLogo = null;
-        var enLogo = null;
+            // 1. Direct match
+            for (var i = 0; i < sorted.length; i++) {
+                if (sorted[i].iso_639_1 === targetLang && sorted[i].file_path) return sorted[i].file_path;
+            }
 
-        for (var i = 0; i < sorted.length; i++) {
-            if (!sorted[i].file_path) continue;
-            if (sorted[i].iso_639_1 === 'uk') ukLogo = sorted[i].file_path;
-            if (sorted[i].iso_639_1 === 'en') enLogo = sorted[i].file_path;
-        }
+            // 2. Ukrainian Fallback -> Russian
+            if (targetLang === 'uk' || targetLang === 'ua') {
+                for (var r = 0; r < sorted.length; r++) {
+                    if (sorted[r].iso_639_1 === 'ru' && sorted[r].file_path) return sorted[r].file_path;
+                }
+            }
 
-        if (ukLogo) return ukLogo;
-        if (enLogo) return enLogo;
-        return null;
-    },
+            // 3. Fallback -> English
+            for (var j = 0; j < sorted.length; j++) {
+                if (sorted[j].iso_639_1 === 'en' && sorted[j].file_path) return sorted[j].file_path;
+            }
 
-    _getLang: function () {
-        var manual = Lampa.Storage.get('nfx_logo_lang', 'auto');
-        if (manual && manual !== 'auto') return manual;
-        var u = Lampa.Storage.get('logo_lang', '');
-        return u || Lampa.Storage.get('language', 'uk') || 'uk';
-    },
+            // 4. Any
+            return sorted[0] && sorted[0].file_path ? sorted[0].file_path : null;
+        },
 
-    resolve: function (movie, done) {
-        if (!movie || !movie.id) { done(null); return; }
+        _getLang: function () {
+            var manual = Lampa.Storage.get('nfx_logo_lang', 'auto');
+            if (manual && manual !== 'auto') return manual;
+            var u = Lampa.Storage.get('logo_lang', '');
+            return u || Lampa.Storage.get('language', 'uk') || 'uk';
+        },
 
-        var type = movie.name ? 'tv' : 'movie';
-        var lang = this._getLang();
-        var cacheKey = this._key(type, movie.id, lang);
+        /**
+         * Resolve logo — uses Lampa.TMDB.api() + Lampa.TMDB.key()
+         */
+        resolve: function (movie, done) {
+            if (!movie || !movie.id) { done(null); return; }
 
-        var cached = this._getCached(cacheKey);
-        if (cached === 'none') { done(null); return; }
-        if (cached) { done(cached); return; }
+            var type = movie.name ? 'tv' : 'movie';
+            var lang = this._getLang();
+            var cacheKey = this._key(type, movie.id, lang);
 
-        var url = Lampa.TMDB.api(
-            type + '/' + movie.id + '/images?api_key=' + Lampa.TMDB.key() +
-            '&include_image_language=' + lang + ',ru,en,null'
-        );
+            var cached = this._getCached(cacheKey);
+            if (cached === 'none') { done(null); return; }
+            if (cached) { done(cached); return; }
 
-        var self = this;
-        var size = Lampa.Storage.get('logo_size', 'original') || 'original';
+            var url = Lampa.TMDB.api(
+                type + '/' + movie.id + '/images?api_key=' + Lampa.TMDB.key() +
+                '&include_image_language=' + lang + ',ru,en,null'
+            );
 
-        $.get(url, function (data_api) {
-            var path = self._pickBest(data_api.logos, lang);
-            if (path) {
-                var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
-                self._setCached(cacheKey, imgUrl);
-                done(imgUrl);
-            } else {
-                self._setCached(cacheKey, 'none');
+            var self = this;
+            var size = Lampa.Storage.get('logo_size', 'original') || 'original';
+
+            $.get(url, function (data_api) {
+                var path = self._pickBest(data_api.logos, lang);
+                if (path) {
+                    var imgUrl = Lampa.TMDB.image('/t/p/' + size + path.replace('.svg', '.png'));
+                    self._setCached(cacheKey, imgUrl);
+                    done(imgUrl);
+                } else {
+                    self._setCached(cacheKey, 'none');
+                    done(null);
+                }
+            }).fail(function () {
                 done(null);
-            }
-        }).fail(function () {
-            done(null);
-        });
-    }
-};
-
-var PremiumLogo = {
-
-    _translationCache: {},
-    
-    _cacheKey: function(text) {
-        return 'nfx_trans_' + text.toLowerCase().replace(/\s+/g, '_');
-    },
-    
-    _getTranslation: function(text, callback) {
-        var self = this;
-        
-        if (!text || text.length === 0) {
-            callback(text);
-            return;
+            });
         }
+    };
+
+
+    // ─────────────────────────────────────────────────────────────────
+    //  SECTION 2.5 — TRANSLATION ENGINE  (MyMemory API)
+    // ─────────────────────────────────────────────────────────────────
+
+    var PremiumLogo = {
+        _cacheKey: function(text) {
+            return 'nfx_trans_' + text.toLowerCase().replace(/\s+/g, '_');
+        },
         
-        var cacheKey = this._cacheKey(text);
-        
-        // 1. Перевіряємо локальний кеш (sessionStorage + Lampa)
-        try {
-            var cached = sessionStorage.getItem(cacheKey);
-            if (cached && cached !== 'error') {
-                console.log('[NFX] Translation from sessionStorage:', text, '->', cached);
-                callback(cached);
+        _getTranslation: function(text, callback) {
+            var self = this;
+            
+            if (!text || text.length === 0) {
+                callback(text);
                 return;
             }
-            cached = Lampa.Storage.get(cacheKey, null);
-            if (cached && cached !== 'error') {
-                console.log('[NFX] Translation from Lampa.Storage:', text, '->', cached);
-                callback(cached);
-                return;
-            }
-        } catch (e) {
-            console.log('[NFX] Cache error:', e);
-        }
-        
-        // 2. Перекладаємо через MyMemory API
-        console.log('[NFX] Requesting translation for:', text);
-        this._translateViaMyMemory(text, cacheKey, callback);
-    },
-    
-    _translateViaMyMemory: function(text, cacheKey, callback) {
-        var self = this;
-        
-        try {
-            // MyMemory API - безплатна, швидка, надійна
-            var encodedText = encodeURIComponent(text);
-            var url = 'https://api.mymemory.translated.net/get?q=' + encodedText + '&langpair=en|uk';
             
-            console.log('[NFX] API URL:', url);
+            var cacheKey = this._cacheKey(text);
             
-            // Використовуємо $.get якщо jQuery доступний, інакше fetch
-            if (typeof $ !== 'undefined' && $.get) {
-                $.get(url, function(response) {
-                    if (response && response.responseData && response.responseData.translatedText) {
-                        var translated = response.responseData.translatedText;
-                        console.log('[NFX] API Translation success:', text, '->', translated);
-                        
-                        // Записуємо у кеш
-                        try {
-                            sessionStorage.setItem(cacheKey, translated);
-                            Lampa.Storage.set(cacheKey, translated);
-                        } catch (e) {
-                            console.log('[NFX] Cache save error:', e);
-                        }
-                        callback(translated);
-                    } else {
-                        console.log('[NFX] API returned empty/invalid response');
-                        callback(text);
-                    }
-                }).fail(function(error) {
-                    console.log('[NFX] API request failed:', error);
-                    callback(text);
-                });
-            } else {
-                // Fallback на fetch для старих платформ
-                fetch(url)
-                    .then(function(response) { return response.json(); })
-                    .then(function(data) {
-                        if (data && data.responseData && data.responseData.translatedText) {
-                            var translated = data.responseData.translatedText;
-                            console.log('[NFX] Fetch Translation success:', text, '->', translated);
-                            
+            // Перевіряємо кеш
+            try {
+                var cached = sessionStorage.getItem(cacheKey);
+                if (cached) {
+                    callback(cached);
+                    return;
+                }
+                cached = Lampa.Storage.get(cacheKey, null);
+                if (cached) {
+                    callback(cached);
+                    return;
+                }
+            } catch (e) {}
+            
+            // Перекладаємо через MyMemory API
+            this._translateViaMyMemory(text, cacheKey, callback);
+        },
+        
+        _translateViaMyMemory: function(text, cacheKey, callback) {
+            try {
+                var encodedText = encodeURIComponent(text);
+                var url = 'https://api.mymemory.translated.net/get?q=' + encodedText + '&langpair=en|uk';
+                
+                if (typeof $ !== 'undefined' && $.get) {
+                    $.get(url, function(response) {
+                        if (response && response.responseData && response.responseData.translatedText) {
+                            var translated = response.responseData.translatedText;
                             try {
                                 sessionStorage.setItem(cacheKey, translated);
                                 Lampa.Storage.set(cacheKey, translated);
-                            } catch (e) {
-                                console.log('[NFX] Cache save error:', e);
-                            }
+                            } catch (e) {}
                             callback(translated);
                         } else {
-                            console.log('[NFX] Fetch returned empty/invalid response');
                             callback(text);
                         }
-                    })
-                    .catch(function(error) {
-                        console.log('[NFX] Fetch error:', error);
+                    }).fail(function() {
                         callback(text);
                     });
+                } else {
+                    fetch(url)
+                        .then(function(response) { return response.json(); })
+                        .then(function(data) {
+                            if (data && data.responseData && data.responseData.translatedText) {
+                                var translated = data.responseData.translatedText;
+                                try {
+                                    sessionStorage.setItem(cacheKey, translated);
+                                    Lampa.Storage.set(cacheKey, translated);
+                                } catch (e) {}
+                                callback(translated);
+                            } else {
+                                callback(text);
+                            }
+                        })
+                        .catch(function() {
+                            callback(text);
+                        });
+                }
+            } catch (e) {
+                callback(text);
             }
-        } catch (e) {
-            console.log('[NFX] Translation error:', e);
-            callback(text);
-        }
-    },
+        },
 
-    renderTextFallback: function(data) {
+        // Додає переклад до існуючого title елементу
+        addTranslation: function(data, titleElem) {
+            if (!titleElem || !titleElem.length) return;
+            
+            var ukTitle = data.title || data.name || '';
+            var original = data.original_title || data.original_name || '';
+            var self = this;
 
-        var hero = document.querySelector('.full-start-new__body');
-        if (!hero) {
-            console.log('[NFX] No hero element found for fallback');
-            return;
-        }
+            // Якщо є український переклад - нічого не робимо
+            if (ukTitle && ukTitle !== original) {
+                return;
+            }
 
-        // прибираємо старе текстове лого якщо є
-        var old = hero.querySelector('.premium-ua-logo');
-        if (old) old.remove();
+            // Якщо немає оригіналу - виходимо
+            if (!original) return;
 
-        var ukTitle = data.title || data.name || '';
-        var original = data.original_title || data.original_name || '';
-        var self = this;
-
-        console.log('[NFX] renderTextFallback called for:', data.name || data.title, '(', original, ')');
-
-        // якщо переклад відсутній або співпадає з оригіналом — намагаємося перекласти англійське
-        if (!ukTitle || ukTitle === original) {
-            if (original) {
-                console.log('[NFX] No UK translation, attempting to translate:', original);
-                // Намагаємося перекласти англійське ім'я через API
-                self._getTranslation(original, function(translated) {
-                    console.log('[NFX] Translation result:', translated);
-                    self._renderLogo(hero, translated, true);
+            // Перекладаємо англійське ім'я
+            self._getTranslation(original, function(translated) {
+                // Замінюємо текст у існуючому title елементі
+                titleElem.each(function() {
+                    var $el = $(this);
+                    
+                    // Якщо вже є картинка (логотип) - не змінюємо
+                    if ($el.find('img').length > 0) {
+                        return;
+                    }
+                    
+                    // Якщо це текстовий елемент - замінюємо текст
+                    $el.text(translated);
                 });
-            } else {
-                console.log('[NFX] No title or name found');
-            }
-            return;
-        }
-
-        // Якщо є український переклад у TMDB (оригіналу з локалізацією, не машинний переклад)
-        console.log('[NFX] Using native UK translation:', ukTitle);
-        self._renderLogo(hero, ukTitle, false);
-    },
-    
-    _renderLogo: function(hero, text, isTranslated) {
-        if (!text || text.length === 0) {
-            console.log('[NFX] _renderLogo: Empty text, skipping');
-            return;
-        }
-
-        console.log('[NFX] _renderLogo: Rendering', (isTranslated ? 'TRANSLATED' : 'NATIVE'), 'logo');
-
-        var el = document.createElement('div');
-        el.className = 'premium-ua-logo';
-        el.textContent = text;
-
-        // додаємо клас якщо це переведений текст
-        if (isTranslated) {
-            el.classList.add('premium-logo-translated');
-            console.log('[NFX] Added class: premium-logo-translated');
-        } else {
-            el.classList.add('premium-logo-native');
-            console.log('[NFX] Added class: premium-logo-native');
-        }
-
-        hero.prepend(el);
-        console.log('[NFX] Element added to DOM');
-
-        // анімація - з невеликою затримкою щоб CSS мав час застосуватися
-        requestAnimationFrame(function(){
-            requestAnimationFrame(function(){
-                el.classList.add('show');
-                console.log('[NFX] Animation started');
             });
-        });
-    }
-};
+        }
+    };
 
     // ─────────────────────────────────────────────────────────────────
     //  SECTION 3 — HERO PROCESSOR  (logo animation on full card page)
@@ -485,8 +437,8 @@ var PremiumLogo = {
                 if (logoUrl) {
                     startLogoAnimation(logoUrl, titleElem, domTitle);
                 } else {
-                    // Якщо немає логотипу, показуємо текстовий fallback з перекладом
-                    PremiumLogo.renderTextFallback(movie);
+                    // Якщо немає логотипу, намагаємось додати переклад англійської назви
+                    PremiumLogo.addTranslation(movie, titleElem);
                 }
             });
         });
@@ -704,66 +656,6 @@ body {
     padding-left: 4% !important;
 }
 
-/* ================================================================
-   Premium UA logo fallback
-   ================================================================ */
-.premium-ua-logo {
-    font-size: 52px;
-    font-weight: 900;
-    letter-spacing: 1px;
-    color: #fff;
-    text-shadow:
-        0 6px 24px rgba(0,0,0,.85),
-        0 2px 6px rgba(0,0,0,.6);
-
-    opacity: 0;
-    transform: translateY(20px) scale(.96);
-    transition: 
-        opacity .45s cubic-bezier(.2,.8,.2,1),
-        transform .45s cubic-bezier(.2,.8,.2,1);
-
-    margin-bottom: 24px;
-    max-width: 90%;
-    line-height: 1.1;
-    word-wrap: break-word;
-    overflow-wrap: break-word;
-    word-break: break-word;
-    display: inline-block;
-}
-
-.premium-ua-logo.show {
-    opacity: 1 !important;
-    transform: translateY(0) scale(1) !important;
-}
-
-/* Рідний український логотип від TMDB */
-.premium-ua-logo.premium-logo-native {
-    font-size: 52px !important;
-    font-weight: 900 !important;
-    letter-spacing: 1px !important;
-    color: #fff !important;
-    text-shadow:
-        0 6px 24px rgba(0,0,0,.85),
-        0 2px 6px rgba(0,0,0,.6) !important;
-    border-left: none !important;
-    padding-left: 0 !important;
-}
-
-/* Стиль для автоматично перекладеного тексту через API */
-.premium-ua-logo.premium-logo-translated {
-    font-size: 52px !important;
-    font-weight: 900 !important;
-    letter-spacing: 1px !important;
-    color: #fff !important;
-    text-shadow:
-        0 6px 24px rgba(0,0,0,.85),
-        0 2px 6px rgba(0,0,0,.6) !important;
-    /* Червона обідка для позначення перекладу */
-    border-left: 3px solid rgba(229, 9, 20, 0.8) !important;
-    padding-left: 12px !important;
-    /* Переконуємось що обідка видна */
-    box-sizing: border-box !important;
-}
 
 /* ================================================================
    2) CARD BASE — GPU-ready, clean view (NO ghost masks)
