@@ -576,6 +576,33 @@ body {
     padding-left: 4% !important;
 }
 
+/* ================================================================
+   Premium UA logo fallback
+   ================================================================ */
+.premium-ua-logo {
+    font-size: 52px;
+    font-weight: 900;
+    letter-spacing: 1px;
+    color: #fff;
+    text-shadow:
+        0 6px 24px rgba(0,0,0,.85),
+        0 2px 6px rgba(0,0,0,.6);
+
+    opacity: 0;
+    transform: translateY(20px) scale(.96);
+    transition: 
+        opacity .45s cubic-bezier(.2,.8,.2,1),
+        transform .45s cubic-bezier(.2,.8,.2,1);
+
+    margin-bottom: 24px;
+    max-width: 70%;
+    line-height: 1.1;
+}
+
+.premium-ua-logo.show {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+}
 
 /* ================================================================
    2) CARD BASE — GPU-ready, clean view (NO ghost masks)
