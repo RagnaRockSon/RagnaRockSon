@@ -1,5 +1,5 @@
 /**
- * Quality Badges Position Plugin v1.1
+ * Quality Badges Position Plugin v1.2
  * Moves quality badges (4K, HD, HDR, etc.) to bottom-right on Smart TV & Android TV
  * Compatible with Quality Badges plugin by yarikrazor
  */
@@ -7,21 +7,16 @@
 (function () {
     'use strict';
 
-    // Запуск тільки після повного завантаження DOM
-    document.addEventListener('DOMContentLoaded', function () {
+    function startPlugin() {
 
         console.log('[Quality Position] Plugin loading...');
 
-        // ─────────────────────────────────────────────
-        // DETECT DEVICE TYPE
-        // ─────────────────────────────────────────────
-
         var userAgent = navigator.userAgent.toLowerCase();
 
-        // Детектуємо Smart TV
+        // Smart TV detection
         var isSmartTV = /vidaa|webos|tizen|smarttv|metrological|netcast/i.test(userAgent);
 
-        // Детектуємо Android TV
+        // Android TV detection
         var isAndroidTV = /android.*tv|googletv/i.test(userAgent);
 
         var shouldMove = isSmartTV || isAndroidTV;
@@ -36,12 +31,14 @@
         }
 
         // ─────────────────────────────────────────────
-        // ADD STYLES
+        // ADD STYLES (тільки один раз)
         // ─────────────────────────────────────────────
 
         if (!document.getElementById('qb-position-style')) {
+
             var style = document.createElement('style');
             style.id = 'qb-position-style';
+
             style.textContent = `
                 .card .qb-unified-block {
                     top: auto !important;
@@ -72,6 +69,7 @@
                     }
                 }
             `;
+
             document.head.appendChild(style);
             console.log('[Quality Position] Styles injected');
         }
@@ -88,7 +86,6 @@
             return badges.length;
         }
 
-        // Початковий запуск
         var initialCount = repositionBadges();
         console.log('[Quality Position] Initial reposition:', initialCount);
 
@@ -97,11 +94,13 @@
         // ─────────────────────────────────────────────
 
         if (document.body) {
+
             var observer = new MutationObserver(function (mutations) {
                 var found = 0;
 
                 mutations.forEach(function (mutation) {
                     mutation.addedNodes.forEach(function (node) {
+
                         if (node.nodeType === 1) {
 
                             if (node.classList &&
@@ -113,8 +112,8 @@
                             }
 
                             if (node.querySelectorAll) {
-                                var innerBadges = node.querySelectorAll('.qb-unified-block:not(.qb-repositioned)');
-                                innerBadges.forEach(function (b) {
+                                var inner = node.querySelectorAll('.qb-unified-block:not(.qb-repositioned)');
+                                inner.forEach(function (b) {
                                     b.classList.add('qb-repositioned');
                                     found++;
                                 });
@@ -136,7 +135,6 @@
             console.log('[Quality Position] DOM observer started');
         }
 
-        // Періодична перевірка (захист)
         setInterval(function () {
             var count = repositionBadges();
             if (count > 0) {
@@ -145,7 +143,16 @@
         }, 3000);
 
         console.log('[Quality Position] Plugin initialized successfully');
+    }
 
-    });
+    // ─────────────────────────────────────────────
+    // CORRECT LAMPA INITIALIZATION
+    // ─────────────────────────────────────────────
+
+    if (window.Lampa) {
+        startPlugin();
+    } else {
+        document.addEventListener('lampa:ready', startPlugin);
+    }
 
 })();
