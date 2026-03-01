@@ -1,7 +1,7 @@
 /**
  * Quality Badges Plugin v1.0
  * Original author: yarikrazor
- * RagnaRockSon modifications: Move badges to bottom-right on Smart/Android TV
+ * RagnaRockSon modifications: Move badges to bottom-right on Smart/Android TV + TV styles
  */
 
 (function () {
@@ -161,18 +161,16 @@
     // RagnaRockSon modifications start
     // ---------------------------
 
-    // Перевірка TV
     var ua = navigator.userAgent.toLowerCase();
     var isTV = /vidaa|webos|tizen|smarttv|android.*tv|googletv/i.test(ua);
 
     if (isTV) {
-        // Хук на render, щоб переміщати бейджі після вставки
+        // Хук на render
         var origRender = window.render;
         window.render = function(container, data, isCard) {
-            // Викликаємо оригінальну функцію
             origRender(container, data, isCard);
 
-            // Переміщуємо бейджі у нижній правий кут
+            // Переміщення бейджів у правий нижній кут
             container.find('.qb-unified-block').css({
                 top: 'auto',
                 left: 'auto',
@@ -184,6 +182,19 @@
                 zIndex: 20
             });
         };
+
+        // Додаткові стилі для TV (великий екран)
+        if (!document.getElementById('qb-tv-style')) {
+            var style = document.createElement('style');
+            style.id = 'qb-tv-style';
+            style.textContent =
+                '@media (min-width: 1280px) {' +
+                '.card .qb-unified-block { gap: 0.8em !important; }' +
+                '.card .qb-unified-block .quality-badge { padding: 0.4em 0.8em !important; font-size: 1em !important; border-radius: 0.3em !important; }' +
+                '.card .qb-unified-block .qb-prefix-icon { height: 1.2em !important; }' +
+                '}';
+            document.head.appendChild(style);
+        }
     }
 
     // ---------------------------
