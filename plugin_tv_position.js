@@ -3,63 +3,64 @@
 
     function init() {
 
-        console.log('[Quality Position] Plugin initialized');
-
         var userAgent = navigator.userAgent.toLowerCase();
-
         var isSmartTV = /vidaa|webos|tizen|smarttv|metrological|netcast/i.test(userAgent);
         var isAndroidTV = /android.*tv|googletv/i.test(userAgent);
         var shouldMove = isSmartTV || isAndroidTV;
 
         if (!shouldMove) return;
 
-        if (!document.getElementById('qb-position-style')) {
-
+        // Додаємо CSS тільки один раз
+        if (!document.getElementById('qb-tv-position-style')) {
             var style = document.createElement('style');
-            style.id = 'qb-position-style';
-
+            style.id = 'qb-tv-position-style';
             style.textContent =
                 '.card .qb-unified-block {' +
+                'position:absolute !important;' +
                 'top:auto !important;' +
-                'bottom:0.4em !important;' +
                 'left:auto !important;' +
+                'bottom:0.4em !important;' +
                 'right:0.4em !important;' +
-                'align-items:flex-end !important;' +
                 'flex-direction:column !important;' +
+                'align-items:flex-end !important;' +
+                'z-index:20 !important;' +
                 'transition:all 0.3s ease !important;' +
-                '}' +
-                '.card .quality-badge {' +
-                'margin-left:0 !important;' +
                 '}';
-
             document.head.appendChild(style);
         }
 
-        function reposition() {
-            var badges = document.querySelectorAll('.card .qb-unified-block');
+        // Функція переміщення бейджів
+        function repositionBadges() {
+            var badges = document.querySelectorAll('.card .qb-unified-block:not(.qb-tv-repositioned)');
             for (var i = 0; i < badges.length; i++) {
-                badges[i].classList.add('qb-repositioned');
+                badges[i].classList.add('qb-tv-repositioned');
             }
+            return badges.length;
         }
 
-        reposition();
+        // Початкова спроба перемістити вже існуючі бейджі
+        repositionBadges();
 
+        // MutationObserver для нових бейджів
         var observer = new MutationObserver(function () {
-            reposition();
+            repositionBadges();
         });
 
         observer.observe(document.body, {
             childList: true,
             subtree: true
         });
+
+        // Періодична перевірка на випадок, якщо бейджі з'являються через асинхронний код основного плагіна
+        setInterval(repositionBadges, 2000);
     }
 
     function start() {
         if (window.Lampa && Lampa.Plugin) {
             Lampa.Plugin.create({
-                id: 'quality_badges_position',
-                name: 'Quality Badges Position',
-                version: '1.3',
+                id: 'quality_badges_tv_position',
+                name: 'Quality Badges TV Position',
+                version: '1.0',
                 description: 'Moves quality badges to bottom-right on TV devices',
                 onReady: init
             });
