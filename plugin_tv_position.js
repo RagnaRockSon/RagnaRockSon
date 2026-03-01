@@ -39,43 +39,43 @@
     // ─────────────────────────────────────────────────────────────────
 
     var style = document.createElement('style');
-    style.textContent = `
-        /* Move badges to bottom-right on TV devices */
-        .card .qb-unified-block {
-            top: auto !important;
-            bottom: 0.4em !important;
-            left: auto !important;
-            right: 0.4em !important;
-            align-items: flex-end !important;
-            flex-direction: column !important;
-        }
-
-        /* Ensure proper spacing from bottom-right corner */
-        .card .quality-badge {
-            margin-left: 0 !important;
-        }
-
-        /* Add transition for smooth animation */
-        .card .qb-unified-block {
-            transition: all 0.3s ease !important;
-        }
-
-        /* Mark as repositioned */
-        .card .qb-unified-block.qb-repositioned {
-            animation: qb-slide-in 0.3s ease;
-        }
-
-        @keyframes qb-slide-in {
-            from {
-                opacity: 0;
-                transform: translateX(20px);
-            }
-            to {
-                opacity: 1;
-                transform: translateX(0);
-            }
-        }
-    `;
+    style.textContent = '\
+        /* Move badges to bottom-right on TV devices */\
+        .card .qb-unified-block {\
+            top: auto !important;\
+            bottom: 0.4em !important;\
+            left: auto !important;\
+            right: 0.4em !important;\
+            align-items: flex-end !important;\
+            flex-direction: column !important;\
+        }\
+        \
+        /* Ensure proper spacing from bottom-right corner */\
+        .card .quality-badge {\
+            margin-left: 0 !important;\
+        }\
+        \
+        /* Add transition for smooth animation */\
+        .card .qb-unified-block {\
+            transition: all 0.3s ease !important;\
+        }\
+        \
+        /* Mark as repositioned */\
+        .card .qb-unified-block.qb-repositioned {\
+            animation: qb-slide-in 0.3s ease;\
+        }\
+        \
+        @keyframes qb-slide-in {\
+            from {\
+                opacity: 0;\
+                transform: translateX(20px);\
+            }\
+            to {\
+                opacity: 1;\
+                transform: translateX(0);\
+            }\
+        }\
+    ';
     document.head.appendChild(style);
 
     console.log('[Quality Position] Styles injected');
