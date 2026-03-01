@@ -10,7 +10,7 @@
 
         if (!shouldMove) return;
 
-        // Додаємо CSS тільки один раз
+        // CSS для переміщення бейджів
         if (!document.getElementById('qb-tv-position-style')) {
             var style = document.createElement('style');
             style.id = 'qb-tv-position-style';
@@ -30,29 +30,59 @@
         }
 
         // Функція переміщення бейджів
-        function repositionBadges() {
-            var badges = document.querySelectorAll('.card .qb-unified-block:not(.qb-tv-repositioned)');
-            for (var i = 0; i < badges.length; i++) {
-                badges[i].classList.add('qb-tv-repositioned');
-            }
-            return badges.length;
+        function reposition() {
+            $('.card .qb-unified-block').each(function () {
+                var el = $(this);
+                if (!el.hasClass('qb-tv-repositioned')) {
+                    el.addClass('qb-tv-repositioned');
+                    el.css({
+                        top: 'auto',
+                        left: 'auto',
+                        bottom: '0.4em',
+                        right: '0.4em',
+                        flexDirection: 'column',
+                        alignItems: 'flex-end',
+                        position: 'absolute',
+                        zIndex: 20
+                    });
+                }
+            });
         }
 
-        // Початкова спроба перемістити вже існуючі бейджі
-        repositionBadges();
+        // Перше застосування
+        reposition();
 
-        // MutationObserver для нових бейджів
-        var observer = new MutationObserver(function () {
-            repositionBadges();
+        // MutationObserver для всіх нових елементів, які можуть містити бейджі
+        var observer = new MutationObserver(function (mutations) {
+            mutations.forEach(function (mutation) {
+                if (mutation.addedNodes.length) {
+                    $(mutation.addedNodes).each(function () {
+                        // переміщуємо всі знайдені бейджі в нових елементах
+                        $(this).find('.qb-unified-block').addBack('.qb-unified-block').each(function () {
+                            var el = $(this);
+                            if (!el.hasClass('qb-tv-repositioned')) {
+                                el.addClass('qb-tv-repositioned');
+                                el.css({
+                                    top: 'auto',
+                                    left: 'auto',
+                                    bottom: '0.4em',
+                                    right: '0.4em',
+                                    flexDirection: 'column',
+                                    alignItems: 'flex-end',
+                                    position: 'absolute',
+                                    zIndex: 20
+                                });
+                            }
+                        });
+                    });
+                }
+            });
         });
 
         observer.observe(document.body, {
             childList: true,
             subtree: true
         });
-
-        // Періодична перевірка на випадок, якщо бейджі з'являються через асинхронний код основного плагіна
-        setInterval(repositionBadges, 2000);
     }
 
     function start() {
@@ -60,7 +90,7 @@
             Lampa.Plugin.create({
                 id: 'quality_badges_tv_position',
                 name: 'Quality Badges TV Position',
-                version: '1.0',
+                version: '2.0',
                 description: 'Moves quality badges to bottom-right on TV devices',
                 onReady: init
             });
